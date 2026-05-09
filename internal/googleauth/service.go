@@ -10,25 +10,26 @@ import (
 type Service string
 
 const (
-	ServiceGmail     Service = "gmail"
-	ServiceCalendar  Service = "calendar"
-	ServiceChat      Service = "chat"
-	ServiceClassroom Service = "classroom"
-	ServiceDrive     Service = "drive"
-	ServiceDocs      Service = "docs"
-	ServiceSlides    Service = "slides"
-	ServiceContacts  Service = "contacts"
-	ServiceTasks     Service = "tasks"
-	ServicePeople    Service = "people"
-	ServiceSheets    Service = "sheets"
-	ServiceForms     Service = "forms"
-	ServiceMeet      Service = "meet"
-	ServiceAppScript Service = "appscript"
-	ServiceAds       Service = "ads"
-	ServiceGroups    Service = "groups"
-	ServiceKeep      Service = "keep"
-	ServiceAdmin     Service = "admin"
-	ServiceYouTube   Service = "youtube"
+	ServiceGmail         Service = "gmail"
+	ServiceCalendar      Service = "calendar"
+	ServiceChat          Service = "chat"
+	ServiceClassroom     Service = "classroom"
+	ServiceDrive         Service = "drive"
+	ServiceDriveActivity Service = "driveactivity"
+	ServiceDocs          Service = "docs"
+	ServiceSlides        Service = "slides"
+	ServiceContacts      Service = "contacts"
+	ServiceTasks         Service = "tasks"
+	ServicePeople        Service = "people"
+	ServiceSheets        Service = "sheets"
+	ServiceForms         Service = "forms"
+	ServiceMeet          Service = "meet"
+	ServiceAppScript     Service = "appscript"
+	ServiceAds           Service = "ads"
+	ServiceGroups        Service = "groups"
+	ServiceKeep          Service = "keep"
+	ServiceAdmin         Service = "admin"
+	ServiceYouTube       Service = "youtube"
 )
 
 const (
@@ -78,6 +79,7 @@ var serviceOrder = []Service{
 	ServiceChat,
 	ServiceClassroom,
 	ServiceDrive,
+	ServiceDriveActivity,
 	ServiceDocs,
 	ServiceSlides,
 	ServiceContacts,
@@ -139,6 +141,12 @@ var serviceInfoByService = map[Service]serviceInfo{
 		scopes: []string{"https://www.googleapis.com/auth/drive"},
 		user:   true,
 		apis:   []string{"Drive API"},
+	},
+	ServiceDriveActivity: {
+		scopes: []string{"https://www.googleapis.com/auth/drive.activity.readonly"},
+		user:   true,
+		apis:   []string{"Drive Activity API"},
+		note:   "Read-only audit/activity scope; authorize with --services driveactivity",
 	},
 	ServiceDocs: {
 		// Docs commands are implemented via Drive APIs (export/copy/create),
@@ -519,6 +527,8 @@ func scopesForServiceWithOptions(service Service, opts ScopeOptions) ([]string, 
 		return Scopes(service)
 	case ServiceDrive:
 		return []string{driveScopeValue()}, nil
+	case ServiceDriveActivity:
+		return Scopes(service)
 	case ServiceDocs:
 		docScope := "https://www.googleapis.com/auth/documents"
 		if opts.Readonly {

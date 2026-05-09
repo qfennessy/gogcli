@@ -7,6 +7,8 @@
 - YouTube: add `youtube` (alias `yt`) command group for YouTube Data API v3 — list activities, videos, playlists, comment threads, and channels; API key via config `youtube_api_key` or `GOG_YOUTUBE_API_KEY`; OAuth for `--mine` with `gog auth add ... --services youtube`. (#313) — thanks @satputekuldip.
 - Forms: add quiz grading flags to `forms add-question` so choice and short-answer questions can set answer keys and point values when created. (#570) — thanks @dbernaltbn.
 - Calendar: resolve event locations through Places API with `--location-search` / `--place-id`, storing the resolved Place ID in private extended properties. (#140 / #138) — thanks @salmonumbrella.
+- Drive: add `drive changes` start-token/list/watch/stop commands for incremental sync and webhook automation. (#335)
+- Drive: add `drive activity query` for Drive Activity API v2 audit trails with item, folder, time, and action filters. (#337)
 - Meet: add `meet create/get/update/end/history/participants` commands for Google Meet meeting spaces and conference records. (#468) — thanks @regaw-leinad.
 - Forms: add `forms publish` to publish/unpublish existing forms and return the responder URL for automated form creation flows. (#565 / #564) — thanks @bogdanovich.
 

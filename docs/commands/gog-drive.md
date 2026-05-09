@@ -16,6 +16,8 @@ gog drive (drv) <command> [flags]
 
 ## Subcommands
 
+- [gog drive activity](gog-drive-activity.md) - Query Drive Activity audit events
+- [gog drive changes](gog-drive-changes.md) - Track Drive changes for sync and automation
 - [gog drive comments](gog-drive-comments.md) - Manage comments on files
 - [gog drive copy](gog-drive-copy.md) - Copy a file
 - [gog drive delete](gog-drive-delete.md) - Move a file to trash (use --permanent to delete forever)

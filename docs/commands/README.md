@@ -2,7 +2,7 @@
 
 Every `gog` command has a generated docs page. The source of truth is the live CLI schema; run `make docs-commands` after changing command names, flags, help text, aliases, or arguments.
 
-Generated pages: 489.
+Generated pages: 496.
 
 ## Top-level Commands
 
@@ -280,6 +280,13 @@ Generated pages: 489.
     - [gog docs write](gog-docs-write.md) - Write content to a Google Doc
   - [gog download](gog-download.md) - Download a Drive file (alias for 'drive download')
   - [gog drive](gog-drive.md) - Google Drive
+    - [gog drive activity](gog-drive-activity.md) - Query Drive Activity audit events
+      - [gog drive activity query](gog-drive-activity-query.md) - Query Drive Activity API v2
+    - [gog drive changes](gog-drive-changes.md) - Track Drive changes for sync and automation
+      - [gog drive changes list](gog-drive-changes-list.md) - List Drive changes since a page token
+      - [gog drive changes start-token](gog-drive-changes-start-token.md) - Get a Drive changes start page token
+      - [gog drive changes stop](gog-drive-changes-stop.md) - Stop a Drive changes webhook channel
+      - [gog drive changes watch](gog-drive-changes-watch.md) - Watch Drive changes with a webhook channel
     - [gog drive comments](gog-drive-comments.md) - Manage comments on files
       - [gog drive comments create](gog-drive-comments-create.md) - Create a comment on a file
       - [gog drive comments delete](gog-drive-comments-delete.md) - Delete a comment

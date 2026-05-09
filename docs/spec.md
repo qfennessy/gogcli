@@ -172,7 +172,7 @@ Flag aliases:
 - `gog auth credentials list`
 - `gog auth credentials remove [<client>|all]`
 - `gog --client <name> auth credentials <credentials.json|->`
-- `gog auth add <email> [--services user|all|gmail,calendar,chat,classroom,drive,docs,slides,contacts,tasks,sheets,people,forms,appscript,ads,groups,keep,admin] [--readonly] [--drive-scope full|readonly|file] [--gmail-scope full|readonly] [--extra-scopes CSV] [--manual] [--remote] [--step 1|2] [--auth-url URL] [--listen-addr HOST[:PORT]] [--redirect-host HOST] [--timeout DURATION] [--force-consent]`
+- `gog auth add <email> [--services user|all|gmail,calendar,chat,classroom,drive,driveactivity,docs,slides,contacts,tasks,sheets,people,forms,appscript,ads,groups,keep,admin] [--readonly] [--drive-scope full|readonly|file] [--gmail-scope full|readonly] [--extra-scopes CSV] [--manual] [--remote] [--step 1|2] [--auth-url URL] [--listen-addr HOST[:PORT]] [--redirect-host HOST] [--timeout DURATION] [--force-consent]`
 - `gog auth services [--markdown]`
 - `gog auth manage [--services ...] [--listen-addr HOST[:PORT]] [--redirect-host HOST]`
 - `gog auth keep <email> --key <service-account.json>` (Google Keep; Workspace only)
@@ -206,6 +206,11 @@ Flag aliases:
 - `gog drive unshare <fileId> <permissionId>`
 - `gog drive url <fileIds...>`
 - `gog drive drives [--max N] [--page TOKEN] [--query Q]`
+- `gog drive changes start-token [--drive DRIVE_ID]`
+- `gog drive changes list --token TOKEN [--max N] [--all] [--drive DRIVE_ID]`
+- `gog drive changes watch --token TOKEN --webhook-url URL [--channel-id ID] [--channel-token TOKEN]`
+- `gog drive changes stop <channelId> <resourceId>`
+- `gog drive activity query [--file FILE_ID|--folder FOLDER_ID] [--actions edit,share] [--from RFC3339] [--to RFC3339] [--filter FILTER]`
 - `gog slides thumbnail <presentationId> <slideId> [--size small|medium|large] [--format png|jpeg] [--out PATH]`
 - `gog calendar calendars`
 - `gog calendar create-calendar <summary> [--description D] [--timezone TZ] [--location L]`

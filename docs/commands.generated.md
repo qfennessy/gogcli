@@ -235,6 +235,13 @@ Generated from `gog schema --json`.
     - [`gog docs (doc) write <docId> [flags]`](commands/gog-docs-write.md) - Write content to a Google Doc
   - [`gog download (dl) <fileId> [flags]`](commands/gog-download.md) - Download a Drive file (alias for 'drive download')
   - [`gog drive (drv) <command> [flags]`](commands/gog-drive.md) - Google Drive
+    - [`gog drive (drv) activity <command>`](commands/gog-drive-activity.md) - Query Drive Activity audit events
+      - [`gog drive (drv) activity query (list,ls) [flags]`](commands/gog-drive-activity-query.md) - Query Drive Activity API v2
+    - [`gog drive (drv) changes <command>`](commands/gog-drive-changes.md) - Track Drive changes for sync and automation
+      - [`gog drive (drv) changes list (ls) --token=STRING [flags]`](commands/gog-drive-changes-list.md) - List Drive changes since a page token
+      - [`gog drive (drv) changes start-token (token) [flags]`](commands/gog-drive-changes-start-token.md) - Get a Drive changes start page token
+      - [`gog drive (drv) changes stop <channelId> <resourceId>`](commands/gog-drive-changes-stop.md) - Stop a Drive changes webhook channel
+      - [`gog drive (drv) changes watch --token=STRING --webhook-url=STRING [flags]`](commands/gog-drive-changes-watch.md) - Watch Drive changes with a webhook channel
     - [`gog drive (drv) comments <command>`](commands/gog-drive-comments.md) - Manage comments on files
       - [`gog drive (drv) comments create (add,new) <fileId> <content> [flags]`](commands/gog-drive-comments-create.md) - Create a comment on a file
       - [`gog drive (drv) comments delete (rm,del,remove) <fileId> <commentId>`](commands/gog-drive-comments-delete.md) - Delete a comment
