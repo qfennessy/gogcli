@@ -94,10 +94,10 @@ darwin_arm64_expected="$(sha_for_asset "gogcli_${version}_darwin_arm64.tar.gz")"
 linux_amd64_expected="$(sha_for_asset "gogcli_${version}_linux_amd64.tar.gz")"
 linux_arm64_expected="$(sha_for_asset "gogcli_${version}_linux_arm64.tar.gz")"
 
-darwin_amd64_formula="$(formula_sha_for_url "gogcli_#{version}_darwin_amd64.tar.gz")"
-darwin_arm64_formula="$(formula_sha_for_url "gogcli_#{version}_darwin_arm64.tar.gz")"
-linux_amd64_formula="$(formula_sha_for_url "gogcli_#{version}_linux_amd64.tar.gz")"
-linux_arm64_formula="$(formula_sha_for_url "gogcli_#{version}_linux_arm64.tar.gz")"
+darwin_amd64_formula="$(formula_sha_for_url "gogcli_${version}_darwin_amd64.tar.gz")"
+darwin_arm64_formula="$(formula_sha_for_url "gogcli_${version}_darwin_arm64.tar.gz")"
+linux_amd64_formula="$(formula_sha_for_url "gogcli_${version}_linux_amd64.tar.gz")"
+linux_arm64_formula="$(formula_sha_for_url "gogcli_${version}_linux_arm64.tar.gz")"
 
 verify_darwin_asset_signature() {
   local asset="$1"
