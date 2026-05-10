@@ -12,9 +12,22 @@ It is built for terminals, shell scripts, CI, and coding agents:
 - OAuth, direct access tokens, ADC, and Workspace service accounts
 - runtime command allowlists/denylists and baked safety-profile binaries
 - read-only audit/reporting commands for risky surfaces like Drive and Contacts
-- generated docs for every command
+- [generated docs](docs/commands/README.md) for every command
+
+Rendered docs: <https://gogcli.sh/>
+
+Start here:
+
+- [Install](docs/install.md)
+- [Quickstart](docs/quickstart.md)
+- [Auth clients and service accounts](docs/auth-clients.md)
+- [Command index](docs/commands/README.md)
+- [Gmail watch / Pub/Sub push](docs/watch.md) (<https://gogcli.sh/watch.html>)
 
 ## Install
+
+See the full [Install](docs/install.md) guide for Homebrew, Docker, Windows
+ZIPs, source builds, and headless/container keyring setup.
 
 ### Homebrew
 
@@ -63,6 +76,10 @@ Source builds require the Go version declared in `go.mod`.
 
 ## Quick Start
 
+The full walkthrough lives in [Quickstart](docs/quickstart.md). For named OAuth
+clients, remote OAuth, direct access tokens, ADC, and Workspace service
+accounts, see [Auth clients](docs/auth-clients.md).
+
 Create a Google Cloud project, enable the APIs you need, create a Desktop OAuth
 client, then store that client JSON in `gog`.
 
@@ -103,7 +120,15 @@ long-lived refresh tokens.
 
 ## Daily Examples
 
+Every command below has generated reference docs in the
+[Command index](docs/commands/README.md). The feature guides linked under each
+section explain the workflow shape and safety notes.
+
 ### Gmail
+
+Docs: [Gmail workflows](docs/gmail-workflows.md),
+[Gmail watch](docs/watch.md), [email tracking](docs/email-tracking.md),
+[`gog gmail`](docs/commands/gog-gmail.md).
 
 ```bash
 # Search mail and get sanitized message content for agents/scripts.
@@ -119,6 +144,11 @@ gog --gmail-no-send gmail drafts create --to you@example.com --subject test
 
 ### Calendar
 
+Docs: [`gog calendar`](docs/commands/gog-calendar.md),
+[`calendar create`](docs/commands/gog-calendar-create.md),
+[`calendar update`](docs/commands/gog-calendar-update.md),
+[`calendar move`](docs/commands/gog-calendar-move.md).
+
 ```bash
 gog calendar events --today
 gog calendar create --summary "Review" \
@@ -133,6 +163,11 @@ gog calendar move primary <eventId> team-calendar@example.com
 ```
 
 ### Drive
+
+Docs: [Drive audits](docs/drive-audits.md), [raw API dumps](docs/raw-api.md),
+[`gog drive`](docs/commands/gog-drive.md),
+[`drive changes`](docs/commands/gog-drive-changes.md),
+[`drive activity`](docs/commands/gog-drive-activity.md).
 
 ```bash
 # Read-only folder audits.
@@ -154,6 +189,10 @@ gog drive raw <fileId> --pretty
 
 ### Contacts
 
+Docs: [contacts dedupe](docs/contacts-dedupe.md),
+[JSON contact updates](docs/contacts-json-update.md),
+[`gog contacts`](docs/commands/gog-contacts.md).
+
 ```bash
 gog contacts search alice --json
 gog contacts export --all --out contacts.vcf
@@ -165,6 +204,10 @@ gog contacts dedupe --match email,phone,name --dry-run
 
 ### Docs
 
+Docs: [Google Docs editing](docs/docs-editing.md),
+[sed-style document edits](docs/sedmat.md),
+[`gog docs`](docs/commands/gog-docs.md).
+
 ```bash
 gog docs write <docId> --append --markdown --text '## Status'
 gog docs format <docId> --match Status --bold --font-size 18
@@ -174,6 +217,10 @@ gog docs raw <docId> --pretty
 ```
 
 ### Sheets
+
+Docs: [Sheets tables](docs/sheets-tables.md),
+[Sheets formatting](docs/sheets-formatting.md),
+[`gog sheets`](docs/commands/gog-sheets.md).
 
 ```bash
 gog sheets get <spreadsheetId> 'Sheet1!A1:D20' --json
@@ -189,6 +236,11 @@ gog sheets banding set <spreadsheetId> 'Sheet1!A1:D100'
 
 ### Slides and Forms
 
+Docs: [Slides from Markdown](docs/slides-markdown.md),
+[template replacement](docs/slides-template-replacement.md),
+[`gog slides`](docs/commands/gog-slides.md),
+[`gog forms`](docs/commands/gog-forms.md).
+
 ```bash
 gog slides create-from-markdown "Weekly update" --content-file slides.md
 gog slides insert-text <presentationId> <objectId> "New text"
@@ -201,6 +253,11 @@ gog forms raw <formId> --pretty
 
 ### YouTube
 
+Docs: [`gog youtube`](docs/commands/gog-youtube.md),
+[`youtube channels`](docs/commands/gog-youtube-channels.md),
+[`youtube videos`](docs/commands/gog-youtube-videos.md),
+[`youtube activities`](docs/commands/gog-youtube-activities.md).
+
 ```bash
 gog config set youtube_api_key YOUR_API_KEY
 gog yt channels list --id UC_x5XG1OV2P6uZZ5FSM9Ttw --json
@@ -209,6 +266,11 @@ gog yt activities list --mine -a you@gmail.com
 ```
 
 ### Analytics and Search Console
+
+Docs: [`gog analytics`](docs/commands/gog-analytics.md),
+[`analytics report`](docs/commands/gog-analytics-report.md),
+[`gog searchconsole`](docs/commands/gog-searchconsole.md),
+[`searchconsole query`](docs/commands/gog-searchconsole-query.md).
 
 ```bash
 gog analytics accounts --all --json
@@ -219,6 +281,8 @@ gog searchconsole sitemaps submit sc-domain:example.com https://example.com/site
 ```
 
 ### Backup
+
+Docs: [Backup](docs/backup.md), [`gog backup`](docs/commands/gog-backup.md).
 
 ```bash
 gog backup init --repo ~/Backups/gog
@@ -231,6 +295,10 @@ See [docs/backup.md](docs/backup.md) before running broad or unattended backup
 jobs.
 
 ## Output and Automation
+
+Docs: [Safety Profiles](docs/safety-profiles.md),
+[`gog schema`](docs/commands/gog-schema.md),
+[`gog config no-send`](docs/commands/gog-config-no-send.md).
 
 Use `--json` for structured output and `--plain` for stable TSV. Prompts,
 progress, and warnings go to stderr so stdout stays parseable.
@@ -269,6 +337,12 @@ For stricter agent deployments, build or download a baked safety-profile binary.
 See [docs/safety-profiles.md](docs/safety-profiles.md).
 
 ## Auth and Accounts
+
+Docs: [Auth clients](docs/auth-clients.md),
+[`gog auth`](docs/commands/gog-auth.md),
+[`auth add`](docs/commands/gog-auth-add.md),
+[`auth doctor`](docs/commands/gog-auth-doctor.md),
+[`auth service-account`](docs/commands/gog-auth-service-account.md).
 
 ### OAuth clients
 
@@ -336,6 +410,10 @@ domain-wide automation. They do not replace normal OAuth for consumer Gmail
 accounts.
 
 ## Services
+
+Docs: [Command index](docs/commands/README.md),
+[Workspace Admin](docs/workspace-admin.md),
+[`gog auth services`](docs/commands/gog-auth-services.md).
 
 Common user services:
 
@@ -411,14 +489,19 @@ go run scripts/gen-auth-services-md.go
 
 ## Documentation
 
-- [docs/index.md](docs/index.md): docs overview (rendered at <https://gogcli.sh/>)
-- [docs/quickstart.md](docs/quickstart.md): five-minute setup walkthrough
-- [docs/commands/README.md](docs/commands/README.md): generated command index
-- [docs/safety-profiles.md](docs/safety-profiles.md): command guards and baked safe binaries
-- [docs/auth-clients.md](docs/auth-clients.md): OAuth clients, account mapping, and service accounts
-- [docs/workspace-admin.md](docs/workspace-admin.md): Workspace user, org unit, and group administration
-- [docs/sheets-tables.md](docs/sheets-tables.md): structured Sheets tables
-- [docs/backup.md](docs/backup.md): encrypted Google account backups
+- [Overview](docs/index.md) — rendered at <https://gogcli.sh/>
+- [Install](docs/install.md) — <https://gogcli.sh/install.html>
+- [Quickstart](docs/quickstart.md) — <https://gogcli.sh/quickstart.html>
+- [Command index](docs/commands/README.md) — <https://gogcli.sh/commands/>
+- [Gmail workflows](docs/gmail-workflows.md) — <https://gogcli.sh/gmail-workflows.html>
+- [Gmail watch](docs/watch.md) — <https://gogcli.sh/watch.html>
+- [Drive audits](docs/drive-audits.md) — <https://gogcli.sh/drive-audits.html>
+- [Docs editing](docs/docs-editing.md) — <https://gogcli.sh/docs-editing.html>
+- [Sheets tables](docs/sheets-tables.md) and [Sheets formatting](docs/sheets-formatting.md)
+- [Safety profiles](docs/safety-profiles.md) — command guards and baked safe binaries
+- [Auth clients](docs/auth-clients.md) — OAuth clients, account mapping, and service accounts
+- [Workspace Admin](docs/workspace-admin.md) — Workspace user, org unit, and group administration
+- [Backup](docs/backup.md) — encrypted Google account backups
 - [CHANGELOG.md](CHANGELOG.md): release notes
 
 Every command also has help built in:

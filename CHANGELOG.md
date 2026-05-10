@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- Docs: link README examples to the rendered guides and generated command pages.
+
 ## 0.16.0 - 2026-05-10
 
 ### Added
