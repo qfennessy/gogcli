@@ -119,7 +119,7 @@ func SlidesToAPIRequests(slideData []Slide) ([]*slides.Request, map[int]string) 
 						bodyContent.WriteString(item)
 						bodyContent.WriteString("\n")
 					}
-				case "code":
+				case inlineTypeCode:
 					bodyContent.WriteString("```\n")
 					bodyContent.WriteString(elem.Content)
 					bodyContent.WriteString("\n```\n")

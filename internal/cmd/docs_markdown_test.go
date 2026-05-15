@@ -1,8 +1,6 @@
 package cmd
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestParseMarkdown(t *testing.T) {
 	tests := []struct {
@@ -88,6 +86,18 @@ func TestParseInlineFormatting(t *testing.T) {
 			expectedCount: 1,
 		},
 		{
+			name:          "underscore italic text",
+			input:         "This is _italic_ text",
+			expectedText:  "This is italic text",
+			expectedCount: 1,
+		},
+		{
+			name:          "underscore bold text",
+			input:         "This is __bold__ text",
+			expectedText:  "This is bold text",
+			expectedCount: 1,
+		},
+		{
 			name:          "code text",
 			input:         "This is `code` text",
 			expectedText:  "This is code text",
@@ -118,6 +128,150 @@ func TestParseInlineFormatting(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseInlineFormatting_NestedAndUnderscoreStyles(t *testing.T) {
+	styles, text := ParseInlineFormatting("**bold _and italic_** plus foo_bar_baz and ___both___")
+	if text != "bold and italic plus foo_bar_baz and both" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "bold and italic", true, false, false)
+	assertInlineStyle(t, text, styles, "and italic", false, true, false)
+	assertInlineStyle(t, text, styles, "both", true, true, false)
+}
+
+func TestParseInlineFormatting_ClosingMarkerIgnoresCodeSpan(t *testing.T) {
+	styles, text := ParseInlineFormatting("**Use `**` marker** and _keep `_` literal_")
+	if text != "Use ** marker and keep _ literal" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "Use ** marker", true, false, false)
+	assertInlineStyle(t, text, styles, "**", false, false, true)
+	assertInlineStyle(t, text, styles, "keep _ literal", false, true, false)
+	assertInlineStyle(t, text, styles, "_", false, false, true)
+}
+
+func TestParseInlineFormatting_PreservesAdjacentLiteralBackticks(t *testing.T) {
+	for _, input := range []string{"``", "a``b"} {
+		styles, text := ParseInlineFormatting(input)
+		if text != input {
+			t.Fatalf("ParseInlineFormatting(%q) text = %q", input, text)
+		}
+		if len(styles) != 0 {
+			t.Fatalf("ParseInlineFormatting(%q) styles = %#v", input, styles)
+		}
+	}
+
+	styles, text := ParseInlineFormatting("``code``")
+	if text != "code" {
+		t.Fatalf("text = %q", text)
+	}
+	assertInlineStyle(t, text, styles, "code", false, false, true)
+}
+
+func TestParseInlineFormatting_SingleEmphasisContainsStrong(t *testing.T) {
+	styles, text := ParseInlineFormatting("*italic **bold** text* and _slant __strong__ text_")
+	if text != "italic bold text and slant strong text" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "italic bold text", false, true, false)
+	assertInlineStyle(t, text, styles, "bold", true, false, false)
+	assertInlineStyle(t, text, styles, "slant strong text", false, true, false)
+	assertInlineStyle(t, text, styles, "strong", true, false, false)
+}
+
+func TestParseInlineFormatting_SplitsAdjacentDelimiterRuns(t *testing.T) {
+	styles, text := ParseInlineFormatting("**one****two** and *italic **bold*** and **bold *em***")
+	if text != "onetwo and italic bold and bold em" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "one", true, false, false)
+	assertInlineStyle(t, text, styles, "two", true, false, false)
+	assertInlineStyle(t, text, styles, "italic bold", false, true, false)
+	assertInlineStyle(t, text, styles, "bold", true, false, false)
+	assertInlineStyle(t, text, styles, "bold em", true, false, false)
+	assertInlineStyle(t, text, styles, "em", false, true, false)
+}
+
+func TestParseInlineFormatting_StrongThenLiteralStar(t *testing.T) {
+	styles, text := ParseInlineFormatting("**foo***")
+	if text != "foo*" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "foo", true, false, false)
+}
+
+func TestParseInlineFormatting_ItalicThenLiteralStar(t *testing.T) {
+	styles, text := ParseInlineFormatting("*foo**")
+	if text != "foo*" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineStyle(t, text, styles, "foo", false, true, false)
+}
+
+func TestParseInlineFormatting_UnderscoreWhitespaceIsLiteral(t *testing.T) {
+	styles, text := ParseInlineFormatting("before _ foo _ after and a _ b _ c")
+	if text != "before _ foo _ after and a _ b _ c" {
+		t.Fatalf("text = %q", text)
+	}
+	if len(styles) != 0 {
+		t.Fatalf("styles = %#v", styles)
+	}
+}
+
+func TestParseInlineFormatting_LiteralBracketBeforeLink(t *testing.T) {
+	styles, text := ParseInlineFormatting("Use arr[0] and [link](https://x)")
+	if text != "Use arr[0] and link" {
+		t.Fatalf("text = %q", text)
+	}
+
+	assertInlineLink(t, text, styles, "link", "https://x")
+}
+
+func TestParseMarkdown_StripsReporterBlockMarkers(t *testing.T) {
+	input := "> quoted text\n```go\nfmt.Println(\"hi\")\n```"
+	got := ParseMarkdown(input)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(got))
+	}
+	if got[0].Type != MDBlockquote || got[0].Content != "quoted text" {
+		t.Fatalf("blockquote = %#v", got[0])
+	}
+	if got[1].Type != MDCodeBlock || got[1].Content != "fmt.Println(\"hi\")" {
+		t.Fatalf("code block = %#v", got[1])
+	}
+}
+
+func assertInlineStyle(t *testing.T, text string, styles []TextStyle, wantText string, bold, italic, code bool) {
+	t.Helper()
+	for _, style := range styles {
+		if int(style.End) > len(text) {
+			continue
+		}
+		if text[style.Start:style.End] == wantText && style.Bold == bold && style.Italic == italic && style.Code == code {
+			return
+		}
+	}
+	t.Fatalf("missing style text=%q bold=%v italic=%v code=%v in %#v", wantText, bold, italic, code, styles)
+}
+
+func assertInlineLink(t *testing.T, text string, styles []TextStyle, wantText string, wantURL string) {
+	t.Helper()
+	for _, style := range styles {
+		if int(style.End) > len(text) {
+			continue
+		}
+		if text[style.Start:style.End] == wantText && style.Link == wantURL {
+			return
+		}
+	}
+	t.Fatalf("missing link text=%q url=%q in %#v", wantText, wantURL, styles)
 }
 
 func TestParseHeading(t *testing.T) {

@@ -372,7 +372,7 @@ func TestDocsFindReplace_MarkdownMode(t *testing.T) {
 
 	flags := &RootFlags{Account: "a@b.com"}
 	cmd := &DocsFindReplaceCmd{}
-	err := runKong(t, cmd, []string{"doc1", "{{placeholder}}", "**bold text**", "--format", "markdown", "--first"}, newDocsCmdContext(t), flags)
+	err := runKong(t, cmd, []string{"doc1", "{{placeholder}}", "**bold text** and _italic_ and `code` and **bold _and italic_**", "--format", "markdown", "--first"}, newDocsCmdContext(t), flags)
 	if err != nil {
 		t.Fatalf("docs find-replace --format markdown --first: %v", err)
 	}
@@ -391,6 +391,30 @@ func TestDocsFindReplace_MarkdownMode(t *testing.T) {
 	if reqs[1].InsertText == nil {
 		t.Fatal("second request should be InsertText")
 	}
+	if got := reqs[1].InsertText.Text; got != "bold text and italic and code and bold and italic\n" {
+		t.Fatalf("insert text = %q", got)
+	}
+	if strings.Contains(reqs[1].InsertText.Text, "**") || strings.Contains(reqs[1].InsertText.Text, "_italic_") || strings.Contains(reqs[1].InsertText.Text, "`") {
+		t.Fatalf("insert text leaked markdown markers: %q", reqs[1].InsertText.Text)
+	}
+	if !hasTextStyleRequest(reqs, func(style *docs.TextStyle) bool { return style.Bold }) {
+		t.Fatal("expected bold text style request")
+	}
+	if !hasTextStyleRequest(reqs, func(style *docs.TextStyle) bool { return style.Italic }) {
+		t.Fatal("expected italic text style request")
+	}
+	if !hasTextStyleRequest(reqs, func(style *docs.TextStyle) bool { return style.WeightedFontFamily != nil }) {
+		t.Fatal("expected code text style request")
+	}
+}
+
+func hasTextStyleRequest(reqs []*docs.Request, pred func(*docs.TextStyle) bool) bool {
+	for _, req := range reqs {
+		if req.UpdateTextStyle != nil && req.UpdateTextStyle.TextStyle != nil && pred(req.UpdateTextStyle.TextStyle) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDocsFindReplace_MarkdownNoMatch(t *testing.T) {

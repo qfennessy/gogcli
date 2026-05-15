@@ -31,6 +31,7 @@
 - Drive: make `drive share --dry-run` stop before permission creation for user and domain shares, including `--notify`.
 - Forms: make `forms create --description` apply the description with a follow-up batch update, and preserve zero-valued indexes in `forms move-question`.
 - Analytics: show Analytics Admin/Data API enablement hints instead of an Admin SDK hint for GA API-disabled errors.
+- Docs: make `docs find-replace --format markdown` strip inline and block Markdown markers while preserving nested bold/italic/code/link formatting in the inserted Google Doc content. (#586) — thanks @sebsnyk.
 - YouTube: preserve API-key authentication when wrapping requests with the retry transport, so public `youtube`/`yt` reads no longer fail as unregistered callers. (#578) — thanks @adityarya24.
 - Docs: update OAuth success/accounts GitHub links to the `openclaw/gogcli` repository. (#561)
 
