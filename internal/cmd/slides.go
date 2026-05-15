@@ -201,11 +201,6 @@ type SlidesCreateFromMarkdownCmd struct {
 
 func (c *SlidesCreateFromMarkdownCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
-	account, err := requireAccount(flags)
-	if err != nil {
-		return err
-	}
-
 	title := strings.TrimSpace(c.Title)
 	if title == "" {
 		return usage("empty title")
@@ -213,6 +208,7 @@ func (c *SlidesCreateFromMarkdownCmd) Run(ctx context.Context, flags *RootFlags)
 
 	// Get markdown content
 	var markdown string
+	var err error
 	switch {
 	case c.ContentFile != "":
 		var data []byte
@@ -229,6 +225,24 @@ func (c *SlidesCreateFromMarkdownCmd) Run(ctx context.Context, flags *RootFlags)
 
 	if c.Debug {
 		debugSlides = true
+	}
+
+	parsedSlides := ParseMarkdownToSlides(markdown)
+	if len(parsedSlides) == 0 {
+		return fmt.Errorf("no slides found in markdown")
+	}
+	if dryRunErr := dryRunExit(ctx, flags, "slides.create-from-markdown", map[string]any{
+		"title":        title,
+		"slides":       len(parsedSlides),
+		"parent":       strings.TrimSpace(c.Parent),
+		"content_file": strings.TrimSpace(c.ContentFile),
+	}); dryRunErr != nil {
+		return dryRunErr
+	}
+
+	account, err := requireAccount(flags)
+	if err != nil {
+		return err
 	}
 
 	// Create Slides service

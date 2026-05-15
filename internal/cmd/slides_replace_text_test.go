@@ -46,7 +46,7 @@ func TestSlidesReplaceText(t *testing.T) {
 			Find:           "oldName",
 			Replacement:    "newName",
 		}
-		if err := cmd.Run(ctx, flags); err != nil {
+		if err := cmd.Run(ctx, flags); err != nil && ExitCode(err) != 0 {
 			t.Fatalf("Run: %v", err)
 		}
 	})
@@ -108,7 +108,7 @@ func TestSlidesReplaceText_MatchCaseAndPages(t *testing.T) {
 			MatchCase:      true,
 			Pages:          []string{"slide_1", "slide_2"},
 		}
-		if err := cmd.Run(ctx, flags); err != nil {
+		if err := cmd.Run(ctx, flags); err != nil && ExitCode(err) != 0 {
 			t.Fatalf("Run: %v", err)
 		}
 	})
@@ -169,11 +169,7 @@ func TestSlidesReplaceText_DryRunNoAPICall(t *testing.T) {
 	}
 
 	flags := &RootFlags{Account: "a@b.com", DryRun: true}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
-	}
-	ctx := ui.WithUI(context.Background(), u)
+	ctx := newCmdJSONContext(t)
 
 	out := captureStdout(t, func() {
 		cmd := &SlidesReplaceTextCmd{
@@ -183,15 +179,24 @@ func TestSlidesReplaceText_DryRunNoAPICall(t *testing.T) {
 			MatchCase:      true,
 			Pages:          []string{"p1"},
 		}
-		if err := cmd.Run(ctx, flags); err != nil {
+		if err := cmd.Run(ctx, flags); err != nil && ExitCode(err) != 0 {
 			t.Fatalf("Run: %v", err)
 		}
 	})
 
-	var body slides.BatchUpdatePresentationRequest
-	if err := json.Unmarshal([]byte(out), &body); err != nil {
+	var got struct {
+		DryRun  bool `json:"dry_run"`
+		Request struct {
+			BatchUpdate slides.BatchUpdatePresentationRequest `json:"batch_update"`
+		} `json:"request"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("dry-run output should be valid JSON: %v\nout=%s", err, out)
 	}
+	if !got.DryRun {
+		t.Fatalf("expected dry_run=true, got %#v", got)
+	}
+	body := got.Request.BatchUpdate
 	if len(body.Requests) != 1 || body.Requests[0].ReplaceAllText == nil {
 		t.Fatalf("expected single ReplaceAllText request in dry-run, got %+v", body.Requests)
 	}

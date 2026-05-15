@@ -52,6 +52,11 @@ type driveBulkPermissionPlan struct {
 
 func (c *DriveBulkRemovePublicCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
+	request := driveBulkScanRequest(c.FileID, c.Parent, c.Depth, c.Max, c.AllDrives)
+	if err := dryRunExit(ctx, flags, "drive.bulk.remove-public", request); err != nil {
+		return err
+	}
+
 	_, svc, err := requireDriveService(ctx, flags)
 	if err != nil {
 		return err
@@ -69,7 +74,7 @@ func (c *DriveBulkRemovePublicCmd) Run(ctx context.Context, flags *RootFlags) er
 	for i := range plans {
 		plans[i].Action = "remove"
 	}
-	if err := driveBulkDryRunOrConfirm(ctx, flags, "drive.bulk.remove-public", plans, "remove public Drive permissions"); err != nil {
+	if err := driveBulkConfirm(ctx, flags, plans, "remove public Drive permissions"); err != nil {
 		return err
 	}
 	for _, plan := range plans {
@@ -98,6 +103,15 @@ func (c *DriveBulkUpdateRoleCmd) Run(ctx context.Context, flags *RootFlags) erro
 	}
 	typeFilter := strings.ToLower(strings.TrimSpace(c.Type))
 	targetFilter := strings.ToLower(strings.TrimSpace(c.Target))
+	request := driveBulkScanRequest(c.FileID, c.Parent, c.Depth, c.Max, c.AllDrives)
+	request["from"] = from
+	request["to"] = to
+	request["type"] = typeFilter
+	request["target"] = targetFilter
+	if dryRunErr := dryRunExit(ctx, flags, "drive.bulk.update-role", request); dryRunErr != nil {
+		return dryRunErr
+	}
+
 	_, svc, err := requireDriveService(ctx, flags)
 	if err != nil {
 		return err
@@ -125,7 +139,7 @@ func (c *DriveBulkUpdateRoleCmd) Run(ctx context.Context, flags *RootFlags) erro
 		plans[i].Action = "updateRole"
 		plans[i].NewRole = to
 	}
-	if err := driveBulkDryRunOrConfirm(ctx, flags, "drive.bulk.update-role", plans, fmt.Sprintf("update %d Drive permission roles from %s to %s", len(plans), from, to)); err != nil {
+	if err := driveBulkConfirm(ctx, flags, plans, fmt.Sprintf("update %d Drive permission roles from %s to %s", len(plans), from, to)); err != nil {
 		return err
 	}
 	for _, plan := range plans {
@@ -171,17 +185,25 @@ func collectDriveBulkPlans(ctx context.Context, svc *drive.Service, items []driv
 	return plans, nil
 }
 
-func driveBulkDryRunOrConfirm(ctx context.Context, flags *RootFlags, op string, plans []driveBulkPermissionPlan, action string) error {
-	if outfmt.IsJSON(ctx) && flags != nil && flags.DryRun {
-		return dryRunExit(ctx, flags, op, map[string]any{"items": plans, "count": len(plans)})
-	}
-	if err := dryRunExit(ctx, flags, op, map[string]any{"items": plans, "count": len(plans)}); err != nil {
-		return err
-	}
+func driveBulkConfirm(ctx context.Context, flags *RootFlags, plans []driveBulkPermissionPlan, action string) error {
 	if len(plans) == 0 {
 		return nil
 	}
 	return confirmDestructiveChecked(ctx, flagsWithoutDryRun(flags), action)
+}
+
+func driveBulkScanRequest(fileID, parent string, depth, maxItems int, allDrives bool) map[string]any {
+	parent = strings.TrimSpace(parent)
+	if parent == "" {
+		parent = "root"
+	}
+	return map[string]any{
+		"file_id":    strings.TrimSpace(fileID),
+		"parent":     parent,
+		"depth":      depth,
+		"max":        maxItems,
+		"all_drives": allDrives,
+	}
 }
 
 func writeDriveBulkResult(ctx context.Context, u *ui.UI, plans []driveBulkPermissionPlan, truncated bool) error {

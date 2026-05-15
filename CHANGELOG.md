@@ -18,6 +18,7 @@
 ### Fixed
 
 - CLI: make mutating dry-runs for contacts, Docs, Drive, Meet, and Slides stop before auth/API calls while still validating local inputs; harden live smoke tests for self-sharing, disabled Meet, Gmail filter labels, and forced batch deletes.
+- CLI: make `drive upload`, `drive bulk remove-public/update-role`, `calendar subscribe`, `docs clear`, `slides create-from-markdown`, `slides insert-text`, `slides replace-text`, `auth tokens import`, and Gmail tracking key rotation dry-runs use the standard parseable dry-run envelope without auth/API access.
 - CLI: keep additional Docs write/update/delete/format/find-replace, Drive mkdir/changes, Gmail label create/modify, and Slides add/delete/replace/update-notes dry-runs offline before auth/API calls.
 - CLI: give destructive Classroom, Gmail, Keep, and Tasks dry-runs stable JSON operation names and structured request payloads instead of prose `op` values with null requests.
 - CLI: keep Docs tab edits, Sheets tab deletes, Drive deletes, comment deletes, auth removals, Gmail delegate/watch removals, Classroom guardian deletes, and other-contact deletes dry-run parseable without auth/API access.

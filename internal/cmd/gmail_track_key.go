@@ -21,6 +21,18 @@ type GmailTrackKeyRotateCmd struct {
 
 func (c *GmailTrackKeyRotateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
+	workerDir := c.WorkerDir
+	if workerDir == "" {
+		workerDir = filepath.Join("internal", "tracking", "worker")
+	}
+	if flags != nil && flags.DryRun {
+		return dryRunExit(ctx, flags, "gmail.track.key.rotate", map[string]any{
+			"account":    strings.TrimSpace(flags.Account),
+			"worker_dir": workerDir,
+			"deploy":     !c.NoDeploy,
+		})
+	}
+
 	account, cfg, err := loadTrackingConfigForAccount(flags)
 	if err != nil {
 		return err
@@ -75,11 +87,6 @@ func (c *GmailTrackKeyRotateCmd) Run(ctx context.Context, flags *RootFlags) erro
 		if dbName == "" {
 			dbName = workerName
 		}
-		workerDir := c.WorkerDir
-		if workerDir == "" {
-			workerDir = filepath.Join("internal", "tracking", "worker")
-		}
-
 		dbID, deployErr := tracking.DeployWorker(ctx, u.Err(), tracking.DeployOptions{
 			WorkerDir:              workerDir,
 			WorkerName:             workerName,

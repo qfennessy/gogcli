@@ -161,13 +161,27 @@ func (c *DriveUploadCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 	defer media.Close()
 	opts.size = size
-	uploadReader := driveUploadReader(ctx, media, opts)
+
+	if dryRunErr := dryRunExit(ctx, flags, "drive.upload", map[string]any{
+		"path":                  opts.localPath,
+		"name":                  driveUploadRemoteName(opts),
+		"parent":                opts.parent,
+		"replace_file_id":       opts.replaceFileID,
+		"mime_type":             opts.mimeType,
+		"size":                  opts.size,
+		"convert":               opts.convert,
+		"convert_mime_type":     opts.convertMimeType,
+		"keep_revision_forever": opts.keepRevisionForever,
+	}); dryRunErr != nil {
+		return dryRunErr
+	}
 
 	_, svc, err := requireDriveService(ctx, flags)
 	if err != nil {
 		return err
 	}
 
+	uploadReader := driveUploadReader(ctx, media, opts)
 	if opts.replaceFileID == "" {
 		return runDriveCreateUpload(ctx, svc, uploadReader, opts)
 	}
@@ -215,6 +229,13 @@ func prepareDriveUpload(c *DriveUploadCmd) (driveUploadOptions, error) {
 	}
 
 	return opts, nil
+}
+
+func driveUploadRemoteName(opts driveUploadOptions) string {
+	if opts.replaceFileID == "" && opts.convert && !opts.isExplicitName {
+		return stripOfficeExt(opts.fileName)
+	}
+	return opts.fileName
 }
 
 func driveUploadShouldStripMarkdownFrontmatter(opts driveUploadOptions, keepFrontmatter bool) bool {

@@ -66,9 +66,15 @@ func (c *SlidesInsertTextCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	body := &slides.BatchUpdatePresentationRequest{Requests: requests}
 
-	// Dry-run: print the request body we would send and exit without calling the API.
-	if flags != nil && flags.DryRun {
-		return writeSlidesBatchUpdateDryRun(ctx, body)
+	if err := dryRunExit(ctx, flags, "slides.insert-text", map[string]any{
+		"presentation_id": presentationID,
+		"object_id":       objectID,
+		"text_length":     len(text),
+		"insertion_index": c.InsertionIndex,
+		"replace":         c.Replace,
+		"batch_update":    body,
+	}); err != nil {
+		return err
 	}
 
 	account, err := requireAccount(flags)

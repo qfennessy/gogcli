@@ -60,9 +60,15 @@ func (c *SlidesReplaceTextCmd) Run(ctx context.Context, flags *RootFlags) error 
 		Requests: []*slides.Request{{ReplaceAllText: req}},
 	}
 
-	// Dry-run: print the request body we would send and exit without calling the API.
-	if flags != nil && flags.DryRun {
-		return writeSlidesBatchUpdateDryRun(ctx, body)
+	if err := dryRunExit(ctx, flags, "slides.replace-text", map[string]any{
+		"presentation_id": presentationID,
+		"find":            c.Find,
+		"replacement":     c.Replacement,
+		"match_case":      c.MatchCase,
+		"pages":           req.PageObjectIds,
+		"batch_update":    body,
+	}); err != nil {
+		return err
 	}
 
 	account, err := requireAccount(flags)

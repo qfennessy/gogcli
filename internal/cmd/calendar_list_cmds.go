@@ -83,20 +83,11 @@ type CalendarSubscribeCmd struct {
 
 func (c *CalendarSubscribeCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
-	account, err := requireAccount(flags)
-	if err != nil {
-		return err
-	}
 	calendarID := strings.TrimSpace(c.CalendarID)
 	if calendarID == "" {
 		return usage("calendarId required")
 	}
 	colorID, err := validateCalendarColorId(c.ColorID)
-	if err != nil {
-		return err
-	}
-
-	svc, err := newCalendarService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -108,6 +99,23 @@ func (c *CalendarSubscribeCmd) Run(ctx context.Context, flags *RootFlags) error 
 	}
 	if colorID != "" {
 		entry.ColorId = colorID
+	}
+
+	if dryRunErr := dryRunExit(ctx, flags, "calendar.subscribe", map[string]any{
+		"calendar_id": calendarID,
+		"entry":       entry,
+	}); dryRunErr != nil {
+		return dryRunErr
+	}
+
+	account, err := requireAccount(flags)
+	if err != nil {
+		return err
+	}
+
+	svc, err := newCalendarService(ctx, account)
+	if err != nil {
+		return err
 	}
 
 	added, err := svc.CalendarList.Insert(entry).Do()

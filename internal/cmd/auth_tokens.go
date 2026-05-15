@@ -202,7 +202,7 @@ type AuthTokensImportCmd struct {
 	InPath string `arg:"" name:"inPath" help:"Input path or '-' for stdin"`
 }
 
-func (c *AuthTokensImportCmd) Run(ctx context.Context, _ *RootFlags) error {
+func (c *AuthTokensImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
 	inPath := c.InPath
 	var b []byte
@@ -248,6 +248,7 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, _ *RootFlags) error {
 	if err != nil {
 		return err
 	}
+
 	var createdAt time.Time
 	if strings.TrimSpace(ex.CreatedAt) != "" {
 		parsed, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(ex.CreatedAt))
@@ -255,6 +256,18 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, _ *RootFlags) error {
 			return parseErr
 		}
 		createdAt = parsed
+	}
+
+	if dryRunErr := dryRunExit(ctx, flags, "auth.tokens.import", map[string]any{
+		"email":         ex.Email,
+		"client":        client,
+		"subject":       strings.TrimSpace(ex.Subject),
+		"services":      ex.Services,
+		"scopes":        ex.Scopes,
+		"created_at":    strings.TrimSpace(ex.CreatedAt),
+		"refresh_token": "provided",
+	}); dryRunErr != nil {
+		return dryRunErr
 	}
 
 	if keychainErr := ensureKeychainAccessIfNeeded(); keychainErr != nil {

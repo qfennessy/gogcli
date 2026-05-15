@@ -13,6 +13,14 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 	if err := os.WriteFile(imagePath, []byte("dry-run image placeholder"), 0o644); err != nil {
 		t.Fatalf("write dry-run image: %v", err)
 	}
+	tokenPath := filepath.Join(t.TempDir(), "token.json")
+	if err := os.WriteFile(tokenPath, []byte(`{"email":"user@example.com","refresh_token":"redacted"}`), 0o600); err != nil {
+		t.Fatalf("write dry-run token: %v", err)
+	}
+	markdownPath := filepath.Join(t.TempDir(), "slides.md")
+	if err := os.WriteFile(markdownPath, []byte("## Slide\nBody"), 0o600); err != nil {
+		t.Fatalf("write dry-run markdown: %v", err)
+	}
 
 	cases := []struct {
 		name string
@@ -38,6 +46,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			name: "docs insert",
 			args: []string{"docs", "insert", "doc123", "hello"},
 			op:   "docs.insert",
+		},
+		{
+			name: "docs clear",
+			args: []string{"docs", "clear", "doc123"},
+			op:   "docs.clear",
 		},
 		{
 			name: "docs write replace",
@@ -120,6 +133,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			op:   "drive.rename",
 		},
 		{
+			name: "drive upload",
+			args: []string{"drive", "upload", imagePath},
+			op:   "drive.upload",
+		},
+		{
 			name: "drive share user",
 			args: []string{"drive", "share", "file123", "--to", "user", "--email", "user@example.com"},
 			op:   "drive.share",
@@ -155,6 +173,16 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			op:   "drive.comments.delete",
 		},
 		{
+			name: "drive bulk remove public",
+			args: []string{"drive", "bulk", "remove-public", "--file", "file123"},
+			op:   "drive.bulk.remove-public",
+		},
+		{
+			name: "drive bulk update role",
+			args: []string{"drive", "bulk", "update-role", "--file", "file123", "--from", "writer", "--to", "reader"},
+			op:   "drive.bulk.update-role",
+		},
+		{
 			name: "auth remove",
 			args: []string{"auth", "remove", "user@example.com"},
 			op:   "auth.remove",
@@ -163,6 +191,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			name: "auth tokens delete",
 			args: []string{"auth", "tokens", "delete", "user@example.com"},
 			op:   "auth.tokens.delete",
+		},
+		{
+			name: "auth tokens import",
+			args: []string{"auth", "tokens", "import", tokenPath},
+			op:   "auth.tokens.import",
 		},
 		{
 			name: "auth service account unset",
@@ -213,6 +246,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			name: "calendar create-calendar",
 			args: []string{"calendar", "create-calendar", "SmokeCal", "--timezone", "UTC"},
 			op:   "calendar.create-calendar",
+		},
+		{
+			name: "calendar subscribe",
+			args: []string{"calendar", "subscribe", "other@example.com"},
+			op:   "calendar.subscribe",
 		},
 		{
 			name: "forms create",
@@ -310,6 +348,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			op:   "gmail.watch.stop",
 		},
 		{
+			name: "gmail track key rotate",
+			args: []string{"gmail", "track", "key", "rotate"},
+			op:   "gmail.track.key.rotate",
+		},
+		{
 			name: "keep delete",
 			args: []string{"keep", "delete", "note123"},
 			op:   "keep.delete",
@@ -400,6 +443,11 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			op:   "slides.create-from-template",
 		},
 		{
+			name: "slides create from markdown",
+			args: []string{"slides", "create-from-markdown", "SmokeSlides", "--content-file", markdownPath},
+			op:   "slides.create-from-markdown",
+		},
+		{
 			name: "slides add slide",
 			args: []string{"slides", "add-slide", "pres123", imagePath, "--notes", "notes"},
 			op:   "slides.add-slide",
@@ -418,6 +466,16 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			name: "slides update notes",
 			args: []string{"slides", "update-notes", "pres123", "slide123", "--notes", "notes"},
 			op:   "slides.update-notes",
+		},
+		{
+			name: "slides insert text",
+			args: []string{"slides", "insert-text", "pres123", "shape123", "hello"},
+			op:   "slides.insert-text",
+		},
+		{
+			name: "slides replace text",
+			args: []string{"slides", "replace-text", "pres123", "old", "new"},
+			op:   "slides.replace-text",
 		},
 		{
 			name: "appscript create",
@@ -510,6 +568,66 @@ func TestDryRunE2E_MutatingCommandsSkipAuthAndAPI(t *testing.T) {
 			if len(payload.Request) == 0 || string(payload.Request) == "null" {
 				t.Fatalf("dry-run output missing structured request: %s", out)
 			}
+		})
+	}
+}
+
+func TestDryRunE2E_CommandSpecificPayloads(t *testing.T) {
+	markdownPath := filepath.Join(t.TempDir(), "deck.md")
+	if err := os.WriteFile(markdownPath, []byte("---\ntitle: x\n---\n# hi\n"), 0o600); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+
+	cases := []struct {
+		name  string
+		args  []string
+		check func(t *testing.T, request map[string]any)
+	}{
+		{
+			name: "drive upload convert previews remote name",
+			args: []string{"drive", "upload", markdownPath, "--convert"},
+			check: func(t *testing.T, request map[string]any) {
+				t.Helper()
+				if got := request["name"]; got != "deck" {
+					t.Fatalf("expected stripped remote name deck, got %#v", got)
+				}
+			},
+		},
+		{
+			name: "gmail track key rotate previews default worker dir",
+			args: []string{"gmail", "track", "key", "rotate"},
+			check: func(t *testing.T, request map[string]any) {
+				t.Helper()
+				want := filepath.Join("internal", "tracking", "worker")
+				if got := request["worker_dir"]; got != want {
+					t.Fatalf("expected worker_dir %q, got %#v", want, got)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := append([]string{"--json", "--dry-run", "--no-input", "--access-token", "invalid-token"}, tc.args...)
+			var stderr string
+			out := captureStdout(t, func() {
+				stderr = captureStderr(t, func() {
+					if err := Execute(args); err != nil && ExitCode(err) != 0 {
+						t.Fatalf("Execute: %v", err)
+					}
+				})
+			})
+			if stderr != "" {
+				t.Fatalf("dry-run touched auth/API stderr: %q", stderr)
+			}
+
+			var payload struct {
+				Request map[string]any `json:"request"`
+			}
+			if err := json.Unmarshal([]byte(out), &payload); err != nil {
+				t.Fatalf("decode dry-run output: %v\nout=%q", err, out)
+			}
+			tc.check(t, payload.Request)
 		})
 	}
 }

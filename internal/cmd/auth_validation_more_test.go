@@ -216,6 +216,9 @@ func TestAuthTokensImport_ErrorsAndStdin(t *testing.T) {
 	if err := (&AuthTokensImportCmd{InPath: badDate}).Run(ctx, &RootFlags{}); err == nil {
 		t.Fatalf("expected date parse error")
 	}
+	if err := (&AuthTokensImportCmd{InPath: badDate}).Run(ctx, &RootFlags{DryRun: true}); err == nil {
+		t.Fatalf("expected dry-run date parse error")
+	}
 
 	ensureKeychainAccess = func() error { return nil }
 	store := newMemStore()

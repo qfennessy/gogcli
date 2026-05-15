@@ -658,6 +658,11 @@ func (c *DocsClearCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if docID == "" {
 		return usage("empty docId")
 	}
+	if err := dryRunExit(ctx, flags, "docs.clear", map[string]any{
+		"document_id": docID,
+	}); err != nil {
+		return err
+	}
 	return (&DocsSedCmd{DocID: docID, Expression: `s/^$//`}).Run(ctx, flags)
 }
 
