@@ -38,8 +38,10 @@ func ReadLine(r io.Reader) (string, error) {
 
 		if b == '\n' || b == '\r' {
 			if b == '\r' {
-				if next, _ := br.Peek(1); len(next) == 1 && next[0] == '\n' {
-					_, _ = br.ReadByte()
+				if br.Buffered() > 0 {
+					if peeked, _ := br.Peek(1); len(peeked) == 1 && peeked[0] == '\n' {
+						_, _ = br.ReadByte()
+					}
 				}
 			}
 

@@ -127,6 +127,8 @@ var serviceInfoByService = map[Service]serviceInfo{
 			"https://www.googleapis.com/auth/chat.messages",
 			"https://www.googleapis.com/auth/chat.memberships",
 			"https://www.googleapis.com/auth/chat.users.readstate.readonly",
+			"https://www.googleapis.com/auth/chat.messages.reactions.create",
+			"https://www.googleapis.com/auth/chat.messages.reactions.readonly",
 		},
 		user: true,
 		apis: []string{"Chat API"},

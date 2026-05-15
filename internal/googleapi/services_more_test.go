@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/steipete/gogcli/internal/config"
+	"github.com/steipete/gogcli/internal/googleauth"
 	"github.com/steipete/gogcli/internal/secrets"
 )
 
@@ -103,5 +104,31 @@ func TestNewKeepWithServiceAccountErrors(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "read service account file") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewChatScopesAreGrantedByChatAuth(t *testing.T) {
+	granted, err := googleauth.Scopes(googleauth.ServiceChat)
+	if err != nil {
+		t.Fatalf("Scopes(ServiceChat): %v", err)
+	}
+
+	seen := make(map[string]struct{}, len(granted))
+	for _, scope := range granted {
+		seen[scope] = struct{}{}
+	}
+
+	requested := []string{
+		scopeChatSpaces,
+		scopeChatMessages,
+		scopeChatMemberships,
+		scopeChatReadStateRO,
+		scopeChatReactionsCreate,
+		scopeChatReactionsRO,
+	}
+	for _, scope := range requested {
+		if _, ok := seen[scope]; !ok {
+			t.Fatalf("NewChat requests scope not granted by chat auth: %s", scope)
+		}
 	}
 }

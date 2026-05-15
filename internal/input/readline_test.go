@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReadLine(t *testing.T) {
@@ -40,5 +41,44 @@ func TestReadLine(t *testing.T) {
 				t.Fatalf("ReadLine() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestReadLineBareCRStreamingReaderReturnsPromptly(t *testing.T) {
+	reader, writer := io.Pipe()
+
+	t.Cleanup(func() {
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	done := make(chan struct {
+		line string
+		err  error
+	}, 1)
+
+	go func() {
+		line, err := ReadLine(reader)
+		done <- struct {
+			line string
+			err  error
+		}{line: line, err: err}
+	}()
+
+	if _, err := writer.Write([]byte("hello\r")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatalf("ReadLine() error = %v, want nil", got.err)
+		}
+
+		if got.line != "hello" {
+			t.Fatalf("ReadLine() = %q, want %q", got.line, "hello")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ReadLine blocked after bare carriage return")
 	}
 }

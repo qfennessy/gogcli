@@ -1,18 +1,27 @@
 package main
 
 import (
+	"os"
+	"strings"
 	"testing"
 	"time"
-
-	_ "github.com/steipete/gogcli/internal/tzembed" // Ensure tz database is embedded
 )
 
 // TestEmbeddedTZData verifies that the time/tzdata import in main.go
 // successfully embeds the IANA timezone database. On macOS/Linux this
 // passes regardless, but on Windows (where Go has no system tz database)
 // it validates the actual fix. The test also guards against accidental
-// removal of the time/tzdata import.
+// removal of the tzembed import.
 func TestEmbeddedTZData(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+
+	if !strings.Contains(string(source), `_ "github.com/steipete/gogcli/internal/tzembed"`) {
+		t.Fatalf("main.go must blank-import internal/tzembed")
+	}
+
 	zones := []string{
 		"America/New_York",
 		"America/Los_Angeles",
