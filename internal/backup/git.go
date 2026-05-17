@@ -74,7 +74,7 @@ func commitChanges(ctx context.Context, cfg Config, message string) (bool, strin
 	if err := git(ctx, cfg.Repo, "diff", "--cached", "--quiet"); err == nil {
 		return false, "", nil
 	}
-	if err := git(ctx, cfg.Repo, "commit", "-m", message); err != nil {
+	if err := git(ctx, cfg.Repo, "-c", "commit.gpgsign=false", "commit", "-m", message); err != nil {
 		return false, "", err
 	}
 	sha, err := gitOutput(ctx, cfg.Repo, "rev-parse", "HEAD")

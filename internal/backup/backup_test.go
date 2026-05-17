@@ -59,6 +59,35 @@ func TestPushSnapshotAndVerify(t *testing.T) {
 	}
 }
 
+func TestCommitChangesIgnoresGlobalCommitSigning(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	globalConfig := filepath.Join(dir, "gitconfig")
+	t.Setenv("GIT_CONFIG_GLOBAL", globalConfig)
+
+	if err := os.WriteFile(globalConfig, []byte("[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n"), 0o600); err != nil {
+		t.Fatalf("write git config: %v", err)
+	}
+	if err := os.MkdirAll(repo, 0o700); err != nil {
+		t.Fatalf("mkdir repo: %v", err)
+	}
+	if err := git(ctx, repo, "init"); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "manifest.json"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	changed, sha, err := commitChanges(ctx, Config{Repo: repo}, "test: signed config ignored")
+	if err != nil {
+		t.Fatalf("commitChanges: %v", err)
+	}
+	if !changed || strings.TrimSpace(sha) == "" {
+		t.Fatalf("expected committed change, changed=%v sha=%q", changed, sha)
+	}
+}
+
 func TestPushSnapshotEncryptsAndCleansPlaintextPath(t *testing.T) {
 	ctx, _, config, _ := initTestBackup(t)
 	tempPath := filepath.Join(t.TempDir(), "messages.jsonl")
@@ -907,7 +936,7 @@ func commitTestRepo(t *testing.T, ctx context.Context, repo, message string) {
 	if err := git(ctx, repo, "add", "."); err != nil {
 		t.Fatalf("git add: %v", err)
 	}
-	if err := git(ctx, repo, "commit", "-m", message); err != nil {
+	if err := git(ctx, repo, "-c", "commit.gpgsign=false", "commit", "-m", message); err != nil {
 		t.Fatalf("git commit: %v", err)
 	}
 }
