@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -10,10 +11,13 @@ import (
 	"github.com/steipete/gogcli/internal/outfmt"
 )
 
-const devVersion = "dev"
+//go:embed VERSION
+var embeddedVersion string
+
+const sentinelDev = "dev"
 
 var (
-	version       = devVersion
+	version       = sentinelDev
 	commit        = ""
 	date          = ""
 	readBuildInfo = debug.ReadBuildInfo
@@ -21,7 +25,7 @@ var (
 
 func resolvedVersion() string {
 	v := strings.TrimSpace(version)
-	if v != "" && v != devVersion && !strings.HasSuffix(v, "-dev") {
+	if v != "" && v != sentinelDev {
 		return v
 	}
 	info, ok := readBuildInfo()
@@ -31,10 +35,10 @@ func resolvedVersion() string {
 			return moduleVersion
 		}
 	}
-	if v == "" {
-		return devVersion
+	if baked := strings.TrimSpace(embeddedVersion); baked != "" {
+		return baked
 	}
-	return v
+	return sentinelDev
 }
 
 func VersionString() string {
