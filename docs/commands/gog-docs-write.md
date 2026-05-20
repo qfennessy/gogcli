@@ -34,11 +34,13 @@ gog docs (doc) write <docId> [flags]
 | `--font-size` | `float64` |  | Font size in points |
 | `-y`<br>`--force`<br>`--assume-yes`<br>`--yes` | `bool` |  | Skip confirmations for destructive commands |
 | `--gmail-no-send` | `bool` | false | Block Gmail send operations (agent safety) |
+| `--heading-level` | `*int` |  | Set paragraph named style to HEADING_1..HEADING_6 (shortcut for --named-style=HEADING_N) |
 | `-h`<br>`--help` | `kong.helpFlag` |  | Show context-sensitive help. |
 | `--italic` | `bool` |  | Set italic |
 | `-j`<br>`--json`<br>`--machine` | `bool` | false | Output JSON to stdout (best for scripting) |
 | `--line-spacing` | `float64` |  | Paragraph line spacing percentage, for example 100 or 150 |
 | `--markdown` | `bool` |  | Convert markdown to Google Docs formatting (requires --replace or --append) |
+| `--named-style` | `string` |  | Set paragraph named style: NORMAL_TEXT, TITLE, SUBTITLE, HEADING_1..HEADING_6 |
 | `--no-bold` | `bool` |  | Clear bold |
 | `--no-input`<br>`--non-interactive`<br>`--noninteractive` | `bool` |  | Never prompt; fail instead (useful for CI) |
 | `--no-italic` | `bool` |  | Clear italic |

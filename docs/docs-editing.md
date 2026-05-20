@@ -37,6 +37,17 @@ gog docs format <docId> --match "Action item" --text-color '#b00020'
 gog docs format <docId> --match Heading --alignment center --line-spacing 120
 ```
 
+Promote an existing paragraph to a heading or title style with
+`--heading-level N` (1..6 shortcut) or `--named-style NAME` (full enum:
+`NORMAL_TEXT`, `TITLE`, `SUBTITLE`, `HEADING_1`..`HEADING_6`,
+case-insensitive). Both set `paragraphStyle.namedStyleType` on the same
+update so they compose with `--alignment` and `--line-spacing`:
+
+```bash
+gog docs format <docId> --match "Status" --heading-level 2
+gog docs format <docId> --match "Overview" --named-style title --alignment center
+```
+
 Use `--match-all` when every occurrence should be formatted.
 
 Command page:
