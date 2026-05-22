@@ -11,6 +11,7 @@ import (
 	"github.com/steipete/gogcli/internal/authclient"
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/googleauth"
+	"github.com/steipete/gogcli/internal/oauthclient"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/secrets"
 	"github.com/steipete/gogcli/internal/ui"
@@ -45,6 +46,7 @@ func (c *AuthStatusCmd) Run(ctx context.Context, flags *RootFlags) error {
 	client := ""
 	credentialsPath := ""
 	credentialsExists := false
+	clientSecretInKeyring := false
 
 	if flags != nil {
 		if a, err := requireAccount(flags); err == nil {
@@ -61,6 +63,7 @@ func (c *AuthStatusCmd) Run(ctx context.Context, flags *RootFlags) error {
 					credentialsExists = true
 				}
 			}
+			clientSecretInKeyring = oauthclient.ClientSecretInKeyring(client)
 			if p, _, ok := bestServiceAccountPathAndMtime(normalizeEmail(account)); ok {
 				serviceAccountConfigured = true
 				serviceAccountPath = p
@@ -88,6 +91,7 @@ func (c *AuthStatusCmd) Run(ctx context.Context, flags *RootFlags) error {
 				"client":                     client,
 				"credentials_path":           credentialsPath,
 				"credentials_exists":         credentialsExists,
+				"client_secret_in_keyring":   clientSecretInKeyring,
 				"auth_preferred":             authPreferred,
 				"service_account_configured": serviceAccountConfigured,
 				"service_account_path":       serviceAccountPath,
@@ -105,6 +109,7 @@ func (c *AuthStatusCmd) Run(ctx context.Context, flags *RootFlags) error {
 			u.Out().Linef("credentials_path\t%s", credentialsPath)
 		}
 		u.Out().Linef("credentials_exists\t%t", credentialsExists)
+		u.Out().Linef("client_secret_in_keyring\t%t", clientSecretInKeyring)
 		u.Out().Linef("auth_preferred\t%s", authPreferred)
 		u.Out().Linef("service_account_configured\t%t", serviceAccountConfigured)
 		if serviceAccountPath != "" {

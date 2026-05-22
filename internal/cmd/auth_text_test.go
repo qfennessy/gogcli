@@ -193,6 +193,7 @@ func TestAuthCredentials_Text(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+	useFileKeyringForAuthCredentials(t)
 
 	in := filepath.Join(t.TempDir(), "creds.json")
 	if err := os.WriteFile(in, []byte(`{"installed":{"client_id":"id","client_secret":"sec"}}`), 0o600); err != nil {

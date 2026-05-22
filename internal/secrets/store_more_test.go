@@ -214,6 +214,12 @@ func TestSetSecretMissingKey(t *testing.T) {
 	}
 }
 
+func TestDeleteSecretMissingKey(t *testing.T) {
+	if err := DeleteSecret(" "); !errors.Is(err, errMissingSecretKey) {
+		t.Fatalf("expected missing key, got %v", err)
+	}
+}
+
 func TestOpenDefaultError(t *testing.T) {
 	origOpen := openKeyringFunc
 
@@ -284,6 +290,34 @@ func TestKeyringStoreSubjectKeyRoundTripAndDelete(t *testing.T) {
 
 	if _, err := ring.Get(subjectTokenKey(client, tok.Subject)); !errors.Is(err, keyring.ErrKeyNotFound) {
 		t.Fatalf("expected subject key deleted, got %v", err)
+	}
+}
+
+func TestKeyringStoreTokenAccessTokenRoundTrip(t *testing.T) {
+	ring := keyring.NewArrayKeyring(nil)
+	store := &KeyringStore{ring: ring}
+	expires := time.Date(2026, 5, 22, 13, 0, 0, 0, time.UTC)
+
+	err := store.SetToken(config.DefaultClientName, "a@b.com", Token{
+		RefreshToken:         "rt",
+		AccessToken:          "at",
+		AccessTokenExpiresAt: expires,
+	})
+	if err != nil {
+		t.Fatalf("SetToken: %v", err)
+	}
+
+	got, err := store.GetToken(config.DefaultClientName, "a@b.com")
+	if err != nil {
+		t.Fatalf("GetToken: %v", err)
+	}
+
+	if got.AccessToken != "at" {
+		t.Fatalf("expected access token, got %q", got.AccessToken)
+	}
+
+	if !got.AccessTokenExpiresAt.Equal(expires) {
+		t.Fatalf("expected access token expiry, got %s", got.AccessTokenExpiresAt)
 	}
 }
 
@@ -564,6 +598,28 @@ func TestSetSecretSetsLabel(t *testing.T) {
 
 	if it.Label != config.AppName {
 		t.Fatalf("expected label %q, got %q", config.AppName, it.Label)
+	}
+}
+
+func TestDeleteSecretDeletesKey(t *testing.T) {
+	ring := keyring.NewArrayKeyring(nil)
+	origOpen := openKeyringFunc
+
+	t.Cleanup(func() { openKeyringFunc = origOpen })
+
+	openKeyringFunc = func() (keyring.Keyring, error) { return ring, nil }
+
+	key := "test/secret"
+	if err := SetSecret(key, []byte("value")); err != nil {
+		t.Fatalf("SetSecret: %v", err)
+	}
+
+	if err := DeleteSecret(key); err != nil {
+		t.Fatalf("DeleteSecret: %v", err)
+	}
+
+	if _, err := ring.Get(key); !errors.Is(err, keyring.ErrKeyNotFound) {
+		t.Fatalf("expected key deleted, got %v", err)
 	}
 }
 

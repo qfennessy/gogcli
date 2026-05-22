@@ -1,9 +1,11 @@
+//nolint:wsl_v5
 package config
 
 import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,6 +44,44 @@ func TestParseGoogleOAuthClientJSON(t *testing.T) {
 			t.Fatalf("expected error")
 		}
 	})
+
+	t.Run("expand env opt in", func(t *testing.T) {
+		t.Setenv("GOG_TEST_CLIENT_ID", "id-env")
+		t.Setenv("GOG_TEST_CLIENT_SECRET", "sec-env")
+		got, err := ParseGoogleOAuthClientJSONWithOptions(
+			[]byte(`{"installed":{"client_id":"${GOG_TEST_CLIENT_ID}","client_secret":"${GOG_TEST_CLIENT_SECRET:-fallback}"}}`),
+			ParseGoogleOAuthClientJSONOptions{ExpandEnv: true},
+		)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if got.ClientID != "id-env" || got.ClientSecret != "sec-env" {
+			t.Fatalf("unexpected expanded credentials: %#v", got)
+		}
+	})
+
+	t.Run("expand env fallback", func(t *testing.T) {
+		got, err := ParseGoogleOAuthClientJSONWithOptions(
+			[]byte(`{"installed":{"client_id":"id","client_secret":"${GOG_TEST_MISSING_SECRET:-fallback-secret}"}}`),
+			ParseGoogleOAuthClientJSONOptions{ExpandEnv: true},
+		)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if got.ClientSecret != "fallback-secret" {
+			t.Fatalf("unexpected fallback: %#v", got)
+		}
+	})
+
+	t.Run("expand env missing strict", func(t *testing.T) {
+		_, err := ParseGoogleOAuthClientJSONWithOptions(
+			[]byte(`{"installed":{"client_id":"id","client_secret":"${GOG_TEST_MISSING_SECRET}"}}`),
+			ParseGoogleOAuthClientJSONOptions{ExpandEnv: true},
+		)
+		if err == nil || !strings.Contains(err.Error(), "GOG_TEST_MISSING_SECRET") {
+			t.Fatalf("expected missing env error, got %v", err)
+		}
+	})
 }
 
 func TestClientCredentials_Roundtrip(t *testing.T) {
@@ -74,6 +114,29 @@ func TestClientCredentials_Roundtrip(t *testing.T) {
 
 	if out.ClientID != in.ClientID || out.ClientSecret != in.ClientSecret {
 		t.Fatalf("mismatch: %#v != %#v", out, in)
+	}
+}
+
+func TestClientCredentials_MetadataRoundtrip(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+
+	in := ClientCredentials{ClientID: "id", ClientSecret: "secret"}
+	if err := WriteClientCredentialsMetadataFor("work", in); err != nil {
+		t.Fatalf("WriteClientCredentialsMetadataFor: %v", err)
+	}
+
+	metadata, err := ReadClientCredentialsMetadataFor("work")
+	if err != nil {
+		t.Fatalf("ReadClientCredentialsMetadataFor: %v", err)
+	}
+	if metadata.ClientID != "id" || metadata.ClientSecret != "" {
+		t.Fatalf("unexpected metadata: %#v", metadata)
+	}
+
+	if _, err := ReadClientCredentialsFor("work"); err == nil {
+		t.Fatalf("expected full credentials read to reject missing secret")
 	}
 }
 

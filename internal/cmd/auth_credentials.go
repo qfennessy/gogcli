@@ -10,6 +10,7 @@ import (
 
 	"github.com/steipete/gogcli/internal/authclient"
 	"github.com/steipete/gogcli/internal/config"
+	"github.com/steipete/gogcli/internal/oauthclient"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/ui"
 )
@@ -21,8 +22,10 @@ type AuthCredentialsCmd struct {
 }
 
 type AuthCredentialsSetCmd struct {
-	Path    string `arg:"" name:"credentials" help:"Path to credentials.json or '-' for stdin"`
-	Domains string `name:"domain" help:"Comma-separated domains to map to this client (e.g. example.com)"`
+	Path      string `arg:"" name:"credentials" help:"Path to credentials.json or '-' for stdin"`
+	Domains   string `name:"domain" help:"Comma-separated domains to map to this client (e.g. example.com)"`
+	ExpandEnv bool   `name:"expand-env" help:"Expand environment placeholders in client_id/client_secret values"`
+	Insecure  bool   `name:"insecure" help:"Store OAuth client_secret in credentials.json instead of the keyring"`
 }
 
 func (c *AuthCredentialsSetCmd) Run(ctx context.Context, _ *RootFlags) error {
@@ -46,12 +49,14 @@ func (c *AuthCredentialsSetCmd) Run(ctx context.Context, _ *RootFlags) error {
 		return err
 	}
 
-	creds, err := config.ParseGoogleOAuthClientJSON(b)
+	creds, err := config.ParseGoogleOAuthClientJSONWithOptions(b, config.ParseGoogleOAuthClientJSONOptions{
+		ExpandEnv: c.ExpandEnv,
+	})
 	if err != nil {
 		return err
 	}
 
-	if err := config.WriteClientCredentialsFor(client, creds); err != nil {
+	if err := oauthclient.WriteClientCredentialsFor(client, creds, c.Insecure); err != nil {
 		return err
 	}
 
@@ -72,13 +77,15 @@ func (c *AuthCredentialsSetCmd) Run(ctx context.Context, _ *RootFlags) error {
 	}
 	if outfmt.IsJSON(ctx) {
 		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
-			"saved":  true,
-			"path":   outPath,
-			"client": client,
+			"saved":                    true,
+			"path":                     outPath,
+			"client":                   client,
+			"client_secret_in_keyring": !c.Insecure,
 		})
 	}
 	u.Out().Linef("path\t%s", outPath)
 	u.Out().Linef("client\t%s", client)
+	u.Out().Linef("client_secret_in_keyring\t%t", !c.Insecure)
 	return nil
 }
 
@@ -108,10 +115,11 @@ func (c *AuthCredentialsListCmd) Run(ctx context.Context, _ *RootFlags) error {
 	}
 
 	type entry struct {
-		Client  string   `json:"client"`
-		Path    string   `json:"path,omitempty"`
-		Default bool     `json:"default"`
-		Domains []string `json:"domains,omitempty"`
+		Client                string   `json:"client"`
+		Path                  string   `json:"path,omitempty"`
+		Default               bool     `json:"default"`
+		Domains               []string `json:"domains,omitempty"`
+		ClientSecretInKeyring bool     `json:"client_secret_in_keyring,omitempty"`
 	}
 
 	entries := make([]entry, 0, len(creds))
@@ -120,10 +128,11 @@ func (c *AuthCredentialsListCmd) Run(ctx context.Context, _ *RootFlags) error {
 		domains := domainMap[info.Client]
 		sort.Strings(domains)
 		entries = append(entries, entry{
-			Client:  info.Client,
-			Path:    info.Path,
-			Default: info.Default,
-			Domains: domains,
+			Client:                info.Client,
+			Path:                  info.Path,
+			Default:               info.Default,
+			Domains:               domains,
+			ClientSecretInKeyring: oauthclient.ClientSecretInKeyring(info.Client),
 		})
 		seen[info.Client] = struct{}{}
 	}
@@ -155,9 +164,9 @@ func (c *AuthCredentialsListCmd) Run(ctx context.Context, _ *RootFlags) error {
 
 	w, done := tableWriter(ctx)
 	defer done()
-	_, _ = fmt.Fprintln(w, "CLIENT\tPATH\tDOMAINS")
+	_, _ = fmt.Fprintln(w, "CLIENT\tPATH\tSECRET_KEYRING\tDOMAINS")
 	for _, e := range entries {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", e.Client, e.Path, strings.Join(e.Domains, ","))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%t\t%s\n", e.Client, e.Path, e.ClientSecretInKeyring, strings.Join(e.Domains, ","))
 	}
 	return nil
 }
@@ -213,7 +222,7 @@ func (c *AuthCredentialsRemoveCmd) Run(ctx context.Context, flags *RootFlags) er
 		return confirmErr
 	}
 
-	if deleteErr := config.DeleteClientCredentialsFor(client); deleteErr != nil {
+	if deleteErr := oauthclient.DeleteClientCredentialsFor(client); deleteErr != nil {
 		return deleteErr
 	}
 
@@ -266,7 +275,7 @@ func (c *AuthCredentialsRemoveCmd) removeAll(ctx context.Context, flags *RootFla
 	var allTokens []string
 	var allDomains []string
 	for _, item := range planned {
-		if err := config.DeleteClientCredentialsFor(item.Client); err != nil {
+		if err := oauthclient.DeleteClientCredentialsFor(item.Client); err != nil {
 			return err
 		}
 		tokens, err := removeTokensForClient(item.Client, item.TokensRemoved)

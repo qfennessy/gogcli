@@ -2,8 +2,15 @@
 
 ## 0.18.1 - Unreleased
 
+### Added
+
+- Auth: store Google OAuth `client_secret` values in the keyring by default while leaving only client metadata on disk; legacy plaintext credentials still read and `auth credentials set --insecure` preserves the old write shape. (#596)
+- Auth: add `auth credentials set --expand-env` for strict environment placeholder expansion in OAuth client JSON. (#599)
+- Auth: let `auth import` seed an initial access token and expiry, and round-trip cached access tokens through token export/import. (#598)
+
 ### Fixed
 
+- People: fall back to token identity when `gog me` / `gog whoami` hit a disabled People API on the OAuth client project. (#460, #461)
 - Gmail: include attachment metadata in `gmail messages search --include-body --json` results. (#620)
 - Auth: let `auth service-account set` read service account keys from stdin (`--key=-` or `--key-stdin`) or an environment variable (`--key-env`). (#600)
 - Auth: serialize file-keyring reads and writes with a shared lock so concurrent `gog` processes cannot observe partial keyring entries or clobber multi-key token updates. (#597)

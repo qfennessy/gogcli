@@ -2,8 +2,17 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/99designs/keyring"
+	gapi "google.golang.org/api/googleapi"
+	"google.golang.org/api/people/v1"
+
+	"github.com/steipete/gogcli/internal/authclient"
+	"github.com/steipete/gogcli/internal/googleauth"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/ui"
 )
@@ -17,6 +26,8 @@ type PeopleCmd struct {
 }
 
 type PeopleMeCmd struct{}
+
+var fallbackPeopleMeProfile = fetchPeopleMeProfileFromToken
 
 func (c *PeopleMeCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
@@ -34,7 +45,13 @@ func (c *PeopleMeCmd) Run(ctx context.Context, flags *RootFlags) error {
 		PersonFields("names,emailAddresses,photos").
 		Do()
 	if err != nil {
-		return err
+		if !isPeopleAccessNotConfigured(err) {
+			return err
+		}
+		person, err = fallbackPeopleMeProfile(ctx, account)
+		if err != nil {
+			return err
+		}
 	}
 
 	if outfmt.IsJSON(ctx) {
@@ -64,4 +81,47 @@ func (c *PeopleMeCmd) Run(ctx context.Context, flags *RootFlags) error {
 		u.Out().Linef("photo\t%s", photo)
 	}
 	return nil
+}
+
+func isPeopleAccessNotConfigured(err error) bool {
+	var apiErr *gapi.Error
+	if errors.As(err, &apiErr) && apiErr.Code == 403 {
+		for _, item := range apiErr.Errors {
+			if item.Reason == "accessNotConfigured" {
+				return true
+			}
+		}
+	}
+	text := err.Error()
+	return strings.Contains(text, "accessNotConfigured") ||
+		strings.Contains(text, "People API has not been used")
+}
+
+func fetchPeopleMeProfileFromToken(ctx context.Context, account string) (*people.Person, error) {
+	client, err := authclient.ResolveClient(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	store, err := openSecretsStore()
+	if err != nil {
+		return nil, err
+	}
+	tok, err := store.GetToken(client, account)
+	if err != nil {
+		if errors.Is(err, keyring.ErrKeyNotFound) {
+			return nil, err
+		}
+		return nil, err
+	}
+	identity, err := googleauth.IdentityForRefreshToken(ctx, client, tok.RefreshToken, googleauth.IdentityScopes(), 15*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	person := &people.Person{
+		ResourceName: peopleMeResource,
+	}
+	if strings.TrimSpace(identity.Email) != "" {
+		person.EmailAddresses = []*people.EmailAddress{{Value: strings.TrimSpace(identity.Email)}}
+	}
+	return person, nil
 }

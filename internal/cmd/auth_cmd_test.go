@@ -124,10 +124,12 @@ func TestAuthTokens_ExportImportRoundtrip_JSON(t *testing.T) {
 	store := newMemSecretsStore()
 	createdAt := time.Date(2025, 12, 12, 0, 0, 0, 0, time.UTC)
 	if err := store.SetToken(config.DefaultClientName, "A@B.COM", secrets.Token{
-		Services:     []string{"gmail"},
-		Scopes:       []string{"s1"},
-		CreatedAt:    createdAt,
-		RefreshToken: "rt",
+		Services:             []string{"gmail"},
+		Scopes:               []string{"s1"},
+		CreatedAt:            createdAt,
+		RefreshToken:         "rt",
+		AccessToken:          "at",
+		AccessTokenExpiresAt: createdAt.Add(time.Hour),
 	}); err != nil {
 		t.Fatalf("SetToken: %v", err)
 	}
@@ -162,6 +164,9 @@ func TestAuthTokens_ExportImportRoundtrip_JSON(t *testing.T) {
 	if !strings.Contains(string(b), "\"refresh_token\"") {
 		t.Fatalf("expected refresh_token in file: %q", string(b))
 	}
+	if !strings.Contains(string(b), "\"access_token\"") {
+		t.Fatalf("expected access_token in file: %q", string(b))
+	}
 
 	// Clear token, then import it back.
 	if err := store.DeleteToken(config.DefaultClientName, "a@b.com"); err != nil {
@@ -185,7 +190,7 @@ func TestAuthTokens_ExportImportRoundtrip_JSON(t *testing.T) {
 	if !importResp.Imported || importResp.Email != "a@b.com" {
 		t.Fatalf("unexpected import resp: %#v", importResp)
 	}
-	if tok, err := store.GetToken(config.DefaultClientName, "a@b.com"); err != nil || tok.RefreshToken != "rt" {
+	if tok, err := store.GetToken(config.DefaultClientName, "a@b.com"); err != nil || tok.RefreshToken != "rt" || tok.AccessToken != "at" {
 		t.Fatalf("expected token restored, got tok=%#v err=%v", tok, err)
 	}
 }

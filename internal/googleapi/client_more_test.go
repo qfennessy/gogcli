@@ -232,10 +232,53 @@ func TestPersistingTokenSource_PersistsRotatedRefreshToken(t *testing.T) {
 	}
 }
 
-func TestPersistingTokenSource_NoRotationDoesNotPersist(t *testing.T) {
-	stored := secrets.Token{Email: "a@b.com", RefreshToken: "same-token"}
+func TestPersistingTokenSource_PersistsAccessToken(t *testing.T) {
+	stored := secrets.Token{
+		Client:       config.DefaultClientName,
+		Email:        "a@b.com",
+		RefreshToken: "refresh-token",
+	}
+	expires := time.Date(2026, 5, 22, 13, 0, 0, 0, time.UTC)
+
 	store := &stubStore{tok: stored}
-	base := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "access", RefreshToken: "same-token"})
+	base := oauth2.StaticTokenSource(&oauth2.Token{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		Expiry:       expires,
+	})
+	ts := newPersistingTokenSource(base, store, config.DefaultClientName, "a@b.com", stored)
+
+	if _, err := ts.Token(); err != nil {
+		t.Fatalf("Token: %v", err)
+	}
+
+	if store.setCalls != 1 {
+		t.Fatalf("expected 1 SetToken call, got %d", store.setCalls)
+	}
+
+	if store.lastSet.AccessToken != "access-token" {
+		t.Fatalf("expected access token to persist, got %q", store.lastSet.AccessToken)
+	}
+
+	if !store.lastSet.AccessTokenExpiresAt.Equal(expires) {
+		t.Fatalf("expected expiry to persist, got %s", store.lastSet.AccessTokenExpiresAt)
+	}
+
+	if store.lastSet.RefreshToken != "refresh-token" {
+		t.Fatalf("refresh token changed unexpectedly: %q", store.lastSet.RefreshToken)
+	}
+}
+
+func TestPersistingTokenSource_NoRotationDoesNotPersist(t *testing.T) {
+	expires := time.Date(2026, 5, 22, 13, 0, 0, 0, time.UTC)
+	stored := secrets.Token{
+		Email:                "a@b.com",
+		RefreshToken:         "same-token",
+		AccessToken:          "access",
+		AccessTokenExpiresAt: expires,
+	}
+	store := &stubStore{tok: stored}
+	base := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "access", RefreshToken: "same-token", Expiry: expires})
 	ts := newPersistingTokenSource(base, store, config.DefaultClientName, "a@b.com", stored)
 
 	if _, err := ts.Token(); err != nil {

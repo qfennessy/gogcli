@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/99designs/keyring"
@@ -13,9 +14,16 @@ import (
 	"github.com/steipete/gogcli/internal/secrets"
 )
 
+func useFileKeyringForAuthCredentials(t *testing.T) {
+	t.Helper()
+	t.Setenv("GOG_KEYRING_BACKEND", "file")
+	t.Setenv("GOG_KEYRING_PASSWORD", "testpass")
+}
+
 func TestExecute_AuthCredentials_JSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	useFileKeyringForAuthCredentials(t)
 
 	in := filepath.Join(t.TempDir(), "creds.json")
 	if err := os.WriteFile(in, []byte(`{"installed":{"client_id":"id","client_secret":"sec"}}`), 0o600); err != nil {
@@ -47,14 +55,33 @@ func TestExecute_AuthCredentials_JSON(t *testing.T) {
 	if parsed.Path != outPath {
 		t.Fatalf("expected %q, got %q", outPath, parsed.Path)
 	}
-	if st, err := os.Stat(outPath); err != nil || st.Size() == 0 {
-		t.Fatalf("stat: %v size=%d", err, st.Size())
+	st, statErr := os.Stat(outPath)
+	if statErr != nil {
+		t.Fatalf("stat: %v", statErr)
+	}
+	if st.Size() == 0 {
+		t.Fatalf("expected credentials metadata to be non-empty")
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read credentials metadata: %v", err)
+	}
+	if strings.Contains(string(data), "sec") {
+		t.Fatalf("client secret leaked to metadata file: %s", data)
+	}
+	creds, err := config.ReadClientCredentialsMetadataFor(config.DefaultClientName)
+	if err != nil {
+		t.Fatalf("ReadClientCredentialsMetadataFor: %v", err)
+	}
+	if creds.ClientID != "id" || creds.ClientSecret != "" {
+		t.Fatalf("unexpected metadata: %#v", creds)
 	}
 }
 
 func TestExecute_AuthCredentials_Stdin_JSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	useFileKeyringForAuthCredentials(t)
 
 	out := captureStdout(t, func() {
 		_ = captureStderr(t, func() {
@@ -78,10 +105,70 @@ func TestExecute_AuthCredentials_Stdin_JSON(t *testing.T) {
 	}
 }
 
+func TestExecute_AuthCredentials_ExpandEnv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	useFileKeyringForAuthCredentials(t)
+	t.Setenv("GOG_TEST_CLIENT_ID", "id-env")
+	t.Setenv("GOG_TEST_CLIENT_SECRET", "sec-env")
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			withStdin(t, `{"installed":{"client_id":"${GOG_TEST_CLIENT_ID}","client_secret":"${GOG_TEST_CLIENT_SECRET}"}}`, func() {
+				if err := Execute([]string{"--json", "auth", "credentials", "-", "--expand-env"}); err != nil {
+					t.Fatalf("Execute: %v", err)
+				}
+			})
+		})
+	})
+
+	var parsed struct {
+		Saved bool `json:"saved"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if !parsed.Saved {
+		t.Fatalf("unexpected: %#v", parsed)
+	}
+}
+
+func TestExecute_AuthCredentials_InsecureStoresPlaintext(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	useFileKeyringForAuthCredentials(t)
+
+	in := filepath.Join(t.TempDir(), "creds.json")
+	if err := os.WriteFile(in, []byte(`{"installed":{"client_id":"id","client_secret":"sec"}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	_ = captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"auth", "credentials", in, "--insecure"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	outPath, err := config.ClientCredentialsPath()
+	if err != nil {
+		t.Fatalf("ClientCredentialsPath: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read credentials: %v", err)
+	}
+	if !strings.Contains(string(data), "sec") {
+		t.Fatalf("expected plaintext secret in insecure mode: %s", data)
+	}
+}
+
 func TestExecute_AuthCredentialsList_JSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+	useFileKeyringForAuthCredentials(t)
 
 	dir, err := config.Dir()
 	if err != nil {
@@ -159,6 +246,7 @@ func TestExecute_AuthCredentialsRemove_RemovesCredentialTokenAndDomain(t *testin
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+	useFileKeyringForAuthCredentials(t)
 
 	origOpen := openSecretsStore
 	t.Cleanup(func() { openSecretsStore = origOpen })
@@ -237,6 +325,7 @@ func TestExecute_AuthCredentialsRemoveAll(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+	useFileKeyringForAuthCredentials(t)
 
 	origOpen := openSecretsStore
 	t.Cleanup(func() { openSecretsStore = origOpen })

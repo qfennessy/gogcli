@@ -33,13 +33,15 @@ type KeyringStore struct {
 }
 
 type Token struct {
-	Client       string    `json:"client,omitempty"`
-	Subject      string    `json:"subject,omitempty"`
-	Email        string    `json:"email"`
-	Services     []string  `json:"services,omitempty"`
-	Scopes       []string  `json:"scopes,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
-	RefreshToken string    `json:"-"`
+	Client               string    `json:"client,omitempty"`
+	Subject              string    `json:"subject,omitempty"`
+	Email                string    `json:"email"`
+	Services             []string  `json:"services,omitempty"`
+	Scopes               []string  `json:"scopes,omitempty"`
+	CreatedAt            time.Time `json:"created_at,omitempty"`
+	RefreshToken         string    `json:"-"`
+	AccessToken          string    `json:"-"`
+	AccessTokenExpiresAt time.Time `json:"-"`
 }
 
 func keyringItem(key string, data []byte) keyring.Item {
@@ -375,6 +377,30 @@ func GetSecret(key string) ([]byte, error) {
 	return item.Data, nil
 }
 
+func DeleteSecret(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return errMissingSecretKey
+	}
+
+	ring, err := openKeyringFunc()
+	if err != nil {
+		return err
+	}
+
+	if err := withOptionalKeyringLock(ring, true, func() error {
+		if removeErr := ring.Remove(key); removeErr != nil {
+			return fmt.Errorf("delete secret: %w", removeErr)
+		}
+
+		return nil
+	}); err != nil {
+		return wrapKeychainError(fmt.Errorf("delete secret: %w", err))
+	}
+
+	return nil
+}
+
 func (s *KeyringStore) Keys() ([]string, error) {
 	var keys []string
 
@@ -417,12 +443,14 @@ func withoutInternalKeyringKeys(keys []string) []string {
 }
 
 type storedToken struct {
-	RefreshToken string    `json:"refresh_token"`
-	Subject      string    `json:"subject,omitempty"`
-	Email        string    `json:"email,omitempty"`
-	Services     []string  `json:"services,omitempty"`
-	Scopes       []string  `json:"scopes,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
+	RefreshToken         string    `json:"refresh_token"`
+	Subject              string    `json:"subject,omitempty"`
+	Email                string    `json:"email,omitempty"`
+	Services             []string  `json:"services,omitempty"`
+	Scopes               []string  `json:"scopes,omitempty"`
+	CreatedAt            time.Time `json:"created_at,omitempty"`
+	AccessToken          string    `json:"access_token,omitempty"`
+	AccessTokenExpiresAt time.Time `json:"access_token_expires_at,omitempty"`
 }
 
 func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
@@ -458,12 +486,14 @@ func (s *KeyringStore) setTokenNoLock(client string, email string, tok Token) er
 	}
 
 	payload, err := json.Marshal(storedToken{ //nolint:gosec // persisted token schema intentionally includes refresh_token
-		RefreshToken: tok.RefreshToken,
-		Subject:      tok.Subject,
-		Email:        tok.Email,
-		Services:     tok.Services,
-		Scopes:       tok.Scopes,
-		CreatedAt:    tok.CreatedAt,
+		RefreshToken:         tok.RefreshToken,
+		Subject:              tok.Subject,
+		Email:                tok.Email,
+		Services:             tok.Services,
+		Scopes:               tok.Scopes,
+		CreatedAt:            tok.CreatedAt,
+		AccessToken:          strings.TrimSpace(tok.AccessToken),
+		AccessTokenExpiresAt: tok.AccessTokenExpiresAt,
 	})
 	if err != nil {
 		return fmt.Errorf("encode token: %w", err)
@@ -544,13 +574,15 @@ func (s *KeyringStore) getTokenNoLock(client string, email string) (Token, error
 	}
 
 	return Token{
-		Client:       normalizedClient,
-		Subject:      strings.TrimSpace(st.Subject),
-		Email:        storedEmailOrFallback(st.Email, email),
-		Services:     st.Services,
-		Scopes:       st.Scopes,
-		CreatedAt:    st.CreatedAt,
-		RefreshToken: st.RefreshToken,
+		Client:               normalizedClient,
+		Subject:              strings.TrimSpace(st.Subject),
+		Email:                storedEmailOrFallback(st.Email, email),
+		Services:             st.Services,
+		Scopes:               st.Scopes,
+		CreatedAt:            st.CreatedAt,
+		RefreshToken:         st.RefreshToken,
+		AccessToken:          strings.TrimSpace(st.AccessToken),
+		AccessTokenExpiresAt: st.AccessTokenExpiresAt,
 	}, nil
 }
 
@@ -787,13 +819,15 @@ func (s *KeyringStore) getTokenBySubjectNoLock(client string, subject string) (T
 	}
 
 	return Token{
-		Client:       normalizedClient,
-		Subject:      strings.TrimSpace(st.Subject),
-		Email:        storedEmailOrFallback(st.Email, ""),
-		Services:     st.Services,
-		Scopes:       st.Scopes,
-		CreatedAt:    st.CreatedAt,
-		RefreshToken: st.RefreshToken,
+		Client:               normalizedClient,
+		Subject:              strings.TrimSpace(st.Subject),
+		Email:                storedEmailOrFallback(st.Email, ""),
+		Services:             st.Services,
+		Scopes:               st.Scopes,
+		CreatedAt:            st.CreatedAt,
+		RefreshToken:         st.RefreshToken,
+		AccessToken:          strings.TrimSpace(st.AccessToken),
+		AccessTokenExpiresAt: st.AccessTokenExpiresAt,
 	}, nil
 }
 

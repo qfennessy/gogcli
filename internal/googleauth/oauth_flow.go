@@ -17,6 +17,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	"github.com/steipete/gogcli/internal/config"
+	"github.com/steipete/gogcli/internal/oauthclient"
 )
 
 type AuthorizeOptions struct {
@@ -53,7 +54,7 @@ type successTemplateData struct {
 }
 
 var (
-	readClientCredentials = config.ReadClientCredentialsFor
+	readClientCredentials = oauthclient.ReadClientCredentialsFor
 	openBrowserFn         = openBrowser
 	oauthEndpoint         = google.Endpoint
 	randomStateFn         = randomState

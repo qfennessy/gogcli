@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/outfmt"
@@ -30,10 +31,12 @@ func withImportOverrides(t *testing.T, store secrets.Store) {
 	origOpen := openSecretsStore
 	origKeychain := ensureKeychainAccess
 	origStdin := readAuthImportStdin
+	origNow := authImportNow
 	t.Cleanup(func() {
 		openSecretsStore = origOpen
 		ensureKeychainAccess = origKeychain
 		readAuthImportStdin = origStdin
+		authImportNow = origNow
 	})
 	openSecretsStore = func() (secrets.Store, error) { return store, nil }
 	ensureKeychainAccess = func() error { return nil }
@@ -223,6 +226,96 @@ func TestAuthImportCmd_ReadsRefreshTokenFromStdin(t *testing.T) {
 	}
 	if tok.RefreshToken != "rt-stdin" {
 		t.Fatalf("expected stdin token, got %q", tok.RefreshToken)
+	}
+}
+
+func TestAuthImportCmd_StoresAccessTokenFromEnv(t *testing.T) {
+	store := newMemSecretsStore()
+	withImportOverrides(t, store)
+	now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+	authImportNow = func() time.Time { return now }
+	t.Setenv("GOG_TEST_REFRESH_TOKEN", "rt")
+	t.Setenv("GOG_TEST_ACCESS_TOKEN", "at\n")
+
+	cmd := &AuthImportCmd{
+		Email:           "a@b.com",
+		RefreshTokenEnv: "GOG_TEST_REFRESH_TOKEN",
+		AccessTokenEnv:  "GOG_TEST_ACCESS_TOKEN",
+	}
+	if err := cmd.Run(newImportTestContext(t), &RootFlags{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	tok, err := store.GetToken("default", "a@b.com")
+	if err != nil {
+		t.Fatalf("GetToken: %v", err)
+	}
+	if tok.AccessToken != "at" {
+		t.Fatalf("expected access token, got %q", tok.AccessToken)
+	}
+	wantExpiry := now.Add(time.Hour)
+	if !tok.AccessTokenExpiresAt.Equal(wantExpiry) {
+		t.Fatalf("expected default expiry %s, got %s", wantExpiry, tok.AccessTokenExpiresAt)
+	}
+}
+
+func TestAuthImportCmd_StoresAccessTokenExpiry(t *testing.T) {
+	store := newMemSecretsStore()
+	withImportOverrides(t, store)
+	now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+	authImportNow = func() time.Time { return now }
+	t.Setenv("GOG_TEST_REFRESH_TOKEN", "rt")
+	t.Setenv("GOG_TEST_ACCESS_TOKEN", "at")
+
+	cmd := &AuthImportCmd{
+		Email:                "a@b.com",
+		RefreshTokenEnv:      "GOG_TEST_REFRESH_TOKEN",
+		AccessTokenEnv:       "GOG_TEST_ACCESS_TOKEN",
+		AccessTokenExpiresAt: "2026-05-22T14:30:00Z",
+	}
+	if err := cmd.Run(newImportTestContext(t), &RootFlags{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	tok, err := store.GetToken("default", "a@b.com")
+	if err != nil {
+		t.Fatalf("GetToken: %v", err)
+	}
+	if got := tok.AccessTokenExpiresAt.UTC().Format(time.RFC3339); got != "2026-05-22T14:30:00Z" {
+		t.Fatalf("unexpected expiry: %s", got)
+	}
+}
+
+func TestAuthImportCmd_RejectsAccessTokenExpiryWithoutToken(t *testing.T) {
+	store := newMemSecretsStore()
+	withImportOverrides(t, store)
+	cmd := authImportCmdWithEnvToken(t, "a@b.com", "rt")
+	cmd.AccessTokenExpiresAt = "2026-05-22T14:30:00Z"
+
+	err := cmd.Run(newImportTestContext(t), &RootFlags{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "requires an access token") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthImportCmd_RejectsBothTokenStdinSources(t *testing.T) {
+	store := newMemSecretsStore()
+	withImportOverrides(t, store)
+	cmd := &AuthImportCmd{
+		Email:             "a@b.com",
+		RefreshTokenStdin: true,
+		AccessTokenStdin:  true,
+	}
+
+	err := cmd.Run(newImportTestContext(t), &RootFlags{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "cannot be combined") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

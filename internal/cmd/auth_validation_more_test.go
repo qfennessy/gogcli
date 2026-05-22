@@ -40,6 +40,7 @@ func TestAuthCredentialsCmd_ErrorsAndStdin(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
+	useFileKeyringForAuthCredentials(t)
 	creds := `{"installed":{"client_id":"id","client_secret":"secret"}}`
 	out := captureStdout(t, func() {
 		withStdin(t, creds, func() {

@@ -154,35 +154,43 @@ func (c *AuthTokensExportCmd) Run(ctx context.Context, _ *RootFlags) error {
 	defer func() { _ = f.Close() }()
 
 	type export struct {
-		Email        string   `json:"email"`
-		Subject      string   `json:"subject,omitempty"`
-		Client       string   `json:"client,omitempty"`
-		Services     []string `json:"services,omitempty"`
-		Scopes       []string `json:"scopes,omitempty"`
-		CreatedAt    string   `json:"created_at,omitempty"`
-		RefreshToken string   `json:"refresh_token"`
+		Email                string   `json:"email"`
+		Subject              string   `json:"subject,omitempty"`
+		Client               string   `json:"client,omitempty"`
+		Services             []string `json:"services,omitempty"`
+		Scopes               []string `json:"scopes,omitempty"`
+		CreatedAt            string   `json:"created_at,omitempty"`
+		RefreshToken         string   `json:"refresh_token"`
+		AccessToken          string   `json:"access_token,omitempty"`
+		AccessTokenExpiresAt string   `json:"access_token_expires_at,omitempty"`
 	}
 	created := ""
 	if !tok.CreatedAt.IsZero() {
 		created = tok.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	accessExpires := ""
+	if !tok.AccessTokenExpiresAt.IsZero() {
+		accessExpires = tok.AccessTokenExpiresAt.UTC().Format(time.RFC3339)
 	}
 
 	enc := json.NewEncoder(f)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	if encErr := enc.Encode(export{ //nolint:gosec // explicit token export writes the requested refresh token payload
-		Email:        tok.Email,
-		Subject:      tok.Subject,
-		Client:       client,
-		Services:     tok.Services,
-		Scopes:       tok.Scopes,
-		CreatedAt:    created,
-		RefreshToken: tok.RefreshToken,
+		Email:                tok.Email,
+		Subject:              tok.Subject,
+		Client:               client,
+		Services:             tok.Services,
+		Scopes:               tok.Scopes,
+		CreatedAt:            created,
+		RefreshToken:         tok.RefreshToken,
+		AccessToken:          tok.AccessToken,
+		AccessTokenExpiresAt: accessExpires,
 	}); encErr != nil {
 		return encErr
 	}
 
-	u.Err().Println("WARNING: exported file contains a refresh token (keep it safe and delete it when done)")
+	u.Err().Println("WARNING: exported file contains OAuth tokens (keep it safe and delete it when done)")
 	if outfmt.IsJSON(ctx) {
 		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
 			"exported": true,
@@ -221,13 +229,15 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	type export struct {
-		Email        string   `json:"email"`
-		Subject      string   `json:"subject,omitempty"`
-		Client       string   `json:"client,omitempty"`
-		Services     []string `json:"services,omitempty"`
-		Scopes       []string `json:"scopes,omitempty"`
-		CreatedAt    string   `json:"created_at,omitempty"`
-		RefreshToken string   `json:"refresh_token"`
+		Email                string   `json:"email"`
+		Subject              string   `json:"subject,omitempty"`
+		Client               string   `json:"client,omitempty"`
+		Services             []string `json:"services,omitempty"`
+		Scopes               []string `json:"scopes,omitempty"`
+		CreatedAt            string   `json:"created_at,omitempty"`
+		RefreshToken         string   `json:"refresh_token"`
+		AccessToken          string   `json:"access_token,omitempty"`
+		AccessTokenExpiresAt string   `json:"access_token_expires_at,omitempty"`
 	}
 	var ex export
 	if unmarshalErr := json.Unmarshal(b, &ex); unmarshalErr != nil {
@@ -257,15 +267,25 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 		}
 		createdAt = parsed
 	}
+	var accessTokenExpiresAt time.Time
+	if strings.TrimSpace(ex.AccessTokenExpiresAt) != "" {
+		parsed, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(ex.AccessTokenExpiresAt))
+		if parseErr != nil {
+			return parseErr
+		}
+		accessTokenExpiresAt = parsed
+	}
 
 	if dryRunErr := dryRunExit(ctx, flags, "auth.tokens.import", map[string]any{
-		"email":         ex.Email,
-		"client":        client,
-		"subject":       strings.TrimSpace(ex.Subject),
-		"services":      ex.Services,
-		"scopes":        ex.Scopes,
-		"created_at":    strings.TrimSpace(ex.CreatedAt),
-		"refresh_token": "provided",
+		"email":                   ex.Email,
+		"client":                  client,
+		"subject":                 strings.TrimSpace(ex.Subject),
+		"services":                ex.Services,
+		"scopes":                  ex.Scopes,
+		"created_at":              strings.TrimSpace(ex.CreatedAt),
+		"refresh_token":           "provided",
+		"access_token_provided":   strings.TrimSpace(ex.AccessToken) != "",
+		"access_token_expires_at": strings.TrimSpace(ex.AccessTokenExpiresAt),
 	}); dryRunErr != nil {
 		return dryRunErr
 	}
@@ -280,13 +300,15 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if err := store.SetToken(client, ex.Email, secrets.Token{
-		Client:       client,
-		Subject:      strings.TrimSpace(ex.Subject),
-		Email:        ex.Email,
-		Services:     ex.Services,
-		Scopes:       ex.Scopes,
-		CreatedAt:    createdAt,
-		RefreshToken: ex.RefreshToken,
+		Client:               client,
+		Subject:              strings.TrimSpace(ex.Subject),
+		Email:                ex.Email,
+		Services:             ex.Services,
+		Scopes:               ex.Scopes,
+		CreatedAt:            createdAt,
+		RefreshToken:         ex.RefreshToken,
+		AccessToken:          strings.TrimSpace(ex.AccessToken),
+		AccessTokenExpiresAt: accessTokenExpiresAt,
 	}); err != nil {
 		return err
 	}

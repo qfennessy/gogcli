@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/99designs/keyring"
 
@@ -19,12 +20,18 @@ var readAuthImportStdin = func() ([]byte, error) {
 	return io.ReadAll(os.Stdin)
 }
 
+var authImportNow = time.Now
+
 type AuthImportCmd struct {
-	Email             string `name:"email" required:"" help:"Account email"`
-	RefreshTokenStdin bool   `name:"refresh-token-stdin" help:"Read OAuth refresh token from stdin"`
-	RefreshTokenFile  string `name:"refresh-token-file" type:"path" help:"Read OAuth refresh token from file"`
-	RefreshTokenEnv   string `name:"refresh-token-env" help:"Read OAuth refresh token from the named environment variable"`
-	ServicesCSV       string `name:"services" help:"Comma-separated services to record on the token (informational; does not affect scopes)"`
+	Email                string `name:"email" required:"" help:"Account email"`
+	RefreshTokenStdin    bool   `name:"refresh-token-stdin" help:"Read OAuth refresh token from stdin"`
+	RefreshTokenFile     string `name:"refresh-token-file" type:"path" help:"Read OAuth refresh token from file"`
+	RefreshTokenEnv      string `name:"refresh-token-env" help:"Read OAuth refresh token from the named environment variable"`
+	AccessTokenStdin     bool   `name:"access-token-stdin" help:"Read OAuth access token from stdin"`
+	AccessTokenFile      string `name:"access-token-file" type:"path" help:"Read OAuth access token from file"`
+	AccessTokenEnv       string `name:"access-token-env" help:"Read OAuth access token from the named environment variable"`
+	AccessTokenExpiresAt string `name:"access-token-expires-at" help:"Access token expiry timestamp (RFC3339; default: now+1h when an access token is provided)"`
+	ServicesCSV          string `name:"services" help:"Comma-separated services to record on the token (informational; does not affect scopes)"`
 }
 
 func (c *AuthImportCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -34,10 +41,17 @@ func (c *AuthImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if email == "" {
 		return usage("--email is required")
 	}
+	if c.RefreshTokenStdin && c.AccessTokenStdin {
+		return usage("--access-token-stdin cannot be combined with --refresh-token-stdin")
+	}
 
 	refreshToken, tokenErr := c.resolveRefreshToken()
 	if tokenErr != nil {
 		return tokenErr
+	}
+	accessToken, accessTokenExpiresAt, accessErr := c.resolveAccessToken()
+	if accessErr != nil {
+		return accessErr
 	}
 
 	override := ""
@@ -53,10 +67,12 @@ func (c *AuthImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	force := flags != nil && flags.Force
 
 	if err := dryRunExit(ctx, flags, "auth.import", map[string]any{
-		"client":   client,
-		"email":    email,
-		"services": services,
-		"force":    force,
+		"client":                  client,
+		"email":                   email,
+		"services":                services,
+		"force":                   force,
+		"access_token_provided":   accessToken != "",
+		"access_token_expires_at": formatOptionalTime(accessTokenExpiresAt),
 	}); err != nil {
 		return err
 	}
@@ -79,10 +95,12 @@ func (c *AuthImportCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if err := store.SetToken(client, email, secrets.Token{
-		Client:       client,
-		Email:        email,
-		Services:     services,
-		RefreshToken: refreshToken,
+		Client:               client,
+		Email:                email,
+		Services:             services,
+		RefreshToken:         refreshToken,
+		AccessToken:          accessToken,
+		AccessTokenExpiresAt: accessTokenExpiresAt,
 	}); err != nil {
 		return err
 	}
@@ -157,4 +175,79 @@ func (c *AuthImportCmd) resolveRefreshToken() (string, error) {
 		return "", usage("refresh token must not be empty")
 	}
 	return token, nil
+}
+
+func (c *AuthImportCmd) resolveAccessToken() (string, time.Time, error) {
+	sources := 0
+	if c.AccessTokenStdin {
+		sources++
+	}
+	if strings.TrimSpace(c.AccessTokenFile) != "" {
+		sources++
+	}
+	if strings.TrimSpace(c.AccessTokenEnv) != "" {
+		sources++
+	}
+	if sources == 0 {
+		if strings.TrimSpace(c.AccessTokenExpiresAt) != "" {
+			return "", time.Time{}, usage("--access-token-expires-at requires an access token source")
+		}
+		return "", time.Time{}, nil
+	}
+	if sources > 1 {
+		return "", time.Time{}, usage("provide exactly one access token source")
+	}
+	var (
+		raw []byte
+		err error
+	)
+	switch {
+	case c.AccessTokenStdin:
+		raw, err = readAuthImportStdin()
+		if err != nil {
+			return "", time.Time{}, fmt.Errorf("read --access-token-stdin: %w", err)
+		}
+	case strings.TrimSpace(c.AccessTokenFile) != "":
+		path, expandErr := config.ExpandPath(strings.TrimSpace(c.AccessTokenFile))
+		if expandErr != nil {
+			return "", time.Time{}, fmt.Errorf("expand --access-token-file: %w", expandErr)
+		}
+		raw, err = os.ReadFile(path) //nolint:gosec // user-provided token file path
+		if err != nil {
+			return "", time.Time{}, fmt.Errorf("read --access-token-file: %w", err)
+		}
+	case strings.TrimSpace(c.AccessTokenEnv) != "":
+		envName := strings.TrimSpace(c.AccessTokenEnv)
+		value, ok := os.LookupEnv(envName)
+		if !ok {
+			return "", time.Time{}, usagef("environment variable %s is not set", envName)
+		}
+		raw = []byte(value)
+	}
+
+	token := strings.TrimSpace(string(raw))
+	if token == "" {
+		return "", time.Time{}, usage("access token must not be empty")
+	}
+
+	expiresAt := authImportNow().UTC().Add(time.Hour)
+	if strings.TrimSpace(c.AccessTokenExpiresAt) != "" {
+		parsed, parseErr := time.Parse(time.RFC3339, strings.TrimSpace(c.AccessTokenExpiresAt))
+		if parseErr != nil {
+			return "", time.Time{}, fmt.Errorf("parse --access-token-expires-at: %w", parseErr)
+		}
+		if !parsed.After(authImportNow()) {
+			return "", time.Time{}, usage("--access-token-expires-at must be in the future")
+		}
+		expiresAt = parsed.UTC()
+	}
+
+	return token, expiresAt, nil
+}
+
+func formatOptionalTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }

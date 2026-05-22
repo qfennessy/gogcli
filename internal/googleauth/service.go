@@ -458,6 +458,10 @@ func ScopesForManage(services []Service) ([]string, error) {
 	return mergeScopes(scopes, []string{scopeOpenID, scopeEmail, scopeUserinfoEmail}), nil
 }
 
+func IdentityScopes() []string {
+	return []string{scopeOpenID, scopeEmail, scopeUserinfoEmail}
+}
+
 func ScopesForManageWithOptions(services []Service, opts ScopeOptions) ([]string, error) {
 	scopes, err := scopesForServicesWithOptions(services, opts)
 	if err != nil {

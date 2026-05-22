@@ -16,11 +16,12 @@ import (
 	"github.com/steipete/gogcli/internal/authclient"
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/googleauth"
+	"github.com/steipete/gogcli/internal/oauthclient"
 	"github.com/steipete/gogcli/internal/secrets"
 )
 
 var (
-	readClientCredentials = config.ReadClientCredentialsFor
+	readClientCredentials = oauthclient.ReadClientCredentialsFor
 	openSecretsStore      = secrets.OpenDefault
 )
 
@@ -65,6 +66,16 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 
 	if refreshToken != "" && refreshToken != p.tok.RefreshToken {
 		updated.RefreshToken = refreshToken
+		changed = true
+	}
+
+	if accessToken := strings.TrimSpace(t.AccessToken); accessToken != "" && accessToken != strings.TrimSpace(p.tok.AccessToken) {
+		updated.AccessToken = accessToken
+		changed = true
+	}
+
+	if !t.Expiry.IsZero() && !t.Expiry.Equal(p.tok.AccessTokenExpiresAt) {
+		updated.AccessTokenExpiresAt = t.Expiry
 		changed = true
 	}
 
@@ -206,7 +217,11 @@ func tokenSourceForAccountScopes(ctx context.Context, serviceLabel string, email
 	// Ensure refresh-token exchanges don't hang forever.
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, &http.Client{Timeout: tokenExchangeTimeout})
 
-	baseSource := cfg.TokenSource(ctx, &oauth2.Token{RefreshToken: tok.RefreshToken})
+	baseSource := cfg.TokenSource(ctx, &oauth2.Token{
+		RefreshToken: tok.RefreshToken,
+		AccessToken:  strings.TrimSpace(tok.AccessToken),
+		Expiry:       tok.AccessTokenExpiresAt,
+	})
 
 	return newPersistingTokenSource(baseSource, store, client, email, tok), nil
 }
