@@ -58,6 +58,7 @@
 - Drive Labels: return usage exit code 2 for invalid `--fields-json` values instead of reporting them as generic runtime failures.
 - Drive: return usage exit code 2 when `drive changes watch` receives a non-HTTPS webhook URL or negative expiration instead of accepting an invalid dry-run request.
 - Drive: validate share email and domain targets before dry-run instead of accepting invalid permission requests.
+- Drive: return usage exit code 2 for non-positive `drive comments list --max` values before auth/API setup.
 - Gmail: return empty JSON arrays, not null, for empty forwarding address, delegate, and send-as settings lists.
 - Gmail: return usage exit code 2 for invalid vacation responder and auto-forwarding settings flags instead of reporting them as generic runtime failures.
 - Gmail: return usage exit code 2 for invalid message formats and batch-modify label flags instead of reporting them as generic runtime failures.
