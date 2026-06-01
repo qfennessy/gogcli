@@ -225,7 +225,7 @@ func resolveTasksAddRepeatConfig(c *TasksAddCmd, due string) (tasksAddRepeatConf
 		config.Unit, err = parseRepeatUnit(config.Repeat)
 	}
 	if err != nil {
-		return tasksAddRepeatConfig{}, err
+		return tasksAddRepeatConfig{}, newUsageError(err)
 	}
 
 	if config.Unit == repeatNone && (config.Until != "" || c.RepeatCount != 0) {
