@@ -29,6 +29,12 @@ func (c *CalendarWorkingLocationCmd) Run(ctx context.Context, flags *RootFlags) 
 	if err != nil {
 		return err
 	}
+	if validateErr := validateCalendarDateFlag("--from", c.From); validateErr != nil {
+		return validateErr
+	}
+	if validateErr := validateCalendarDateFlag("--to", c.To); validateErr != nil {
+		return validateErr
+	}
 
 	summary := c.generateSummary()
 

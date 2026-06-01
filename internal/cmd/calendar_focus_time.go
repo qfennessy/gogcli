@@ -32,6 +32,12 @@ func (c *CalendarFocusTimeCmd) Run(ctx context.Context, flags *RootFlags) error 
 	if err != nil {
 		return err
 	}
+	if validateErr := validateCalendarDateTimeFlag("--from", c.From); validateErr != nil {
+		return validateErr
+	}
+	if validateErr := validateCalendarDateTimeFlag("--to", c.To); validateErr != nil {
+		return validateErr
+	}
 
 	event := &calendar.Event{
 		Summary:      strings.TrimSpace(c.Summary),

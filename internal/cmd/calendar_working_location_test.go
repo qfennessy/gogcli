@@ -158,6 +158,18 @@ func TestCalendarWorkingLocation_InvalidFlagsAreUsageErrors(t *testing.T) {
 			name: "invalid type",
 			args: []string{"--json", "calendar", "working-location", "primary", "--from", "2026-06-15", "--to", "2026-06-15", "--type", "mars", "--dry-run"},
 		},
+		{
+			name: "invalid from date",
+			args: []string{"--json", "calendar", "working-location", "primary", "--from", "nope", "--to", "2026-06-15", "--type", "home", "--dry-run"},
+		},
+		{
+			name: "datetime from date",
+			args: []string{"--json", "calendar", "working-location", "primary", "--from", "2026-06-15T09:00:00Z", "--to", "2026-06-15", "--type", "home", "--dry-run"},
+		},
+		{
+			name: "single digit month date",
+			args: []string{"--json", "calendar", "working-location", "primary", "--from", "2026-6-15", "--to", "2026-06-15", "--type", "home", "--dry-run"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

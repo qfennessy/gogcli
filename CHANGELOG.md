@@ -21,6 +21,7 @@
 - Calendar: return an empty JSON array, not null, for `calendar conflicts --json` when no conflicts are found.
 - Calendar: return usage exit code 2 for invalid event type, color, visibility, transparency, notification, and recurring-scope flags.
 - Calendar: return usage exit code 2 for invalid focus-time and working-location flag values instead of reporting them as generic runtime failures.
+- Calendar: validate focus-time RFC3339 datetimes and working-location dates before dry-run instead of accepting invalid event payloads.
 - Calendar: return usage exit code 2 for invalid time-range flags instead of reporting them as generic runtime failures.
 - Calendar: return usage exit code 2 for invalid `calendar respond --status` values instead of reporting them as generic runtime failures.
 - Calendar: return usage exit code 2 for invalid create-event timezones and reminders instead of reporting them as generic runtime failures.
