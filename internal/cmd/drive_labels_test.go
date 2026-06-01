@@ -39,7 +39,7 @@ func TestDriveLabelsList_JSON(t *testing.T) {
 	newDriveLabelsService = func(context.Context, string) (*drivelabels.Service, error) { return svc, nil }
 
 	out := captureStdout(t, func() {
-		if err := (&DriveLabelsListCmd{PublishedOnly: true, View: "LABEL_VIEW_BASIC"}).Run(newCalendarJSONContext(t), &RootFlags{Account: "a@example.com"}); err != nil {
+		if err := (&DriveLabelsListCmd{Max: 50, PublishedOnly: true, View: "LABEL_VIEW_BASIC"}).Run(newCalendarJSONContext(t), &RootFlags{Account: "a@example.com"}); err != nil {
 			t.Fatalf("Run: %v", err)
 		}
 	})
@@ -54,6 +54,29 @@ func TestDriveLabelsList_JSON(t *testing.T) {
 	}
 	if parsed.LabelCount != 1 || len(parsed.Labels) != 1 || parsed.Labels[0].Name != "labels/abc" {
 		t.Fatalf("unexpected output: %#v", parsed)
+	}
+}
+
+func TestDriveLabelsListInvalidMaxFailsBeforeService(t *testing.T) {
+	orig := newDriveLabelsService
+	t.Cleanup(func() { newDriveLabelsService = orig })
+	newDriveLabelsService = func(context.Context, string) (*drivelabels.Service, error) {
+		t.Fatalf("expected max validation to fail before creating drive labels service")
+		return nil, context.Canceled
+	}
+
+	ctx := newCmdOutputContext(t, io.Discard, io.Discard)
+	flags := &RootFlags{Account: "a@example.com"}
+
+	for _, args := range [][]string{{"--max", "0"}, {"--max=-1"}} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			cmd := &DriveLabelsListCmd{}
+			err := runKong(t, cmd, args, ctx, flags)
+			var exitErr *ExitError
+			if !errors.As(err, &exitErr) || exitErr.Code != 2 || !strings.Contains(err.Error(), "max must be > 0") {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 
@@ -88,6 +111,29 @@ func TestDriveLabelsFileList_JSON(t *testing.T) {
 	})
 	if !strings.Contains(out, `"labelCount": 1`) || !strings.Contains(out, "label1") {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestDriveLabelsFileListInvalidMaxFailsBeforeService(t *testing.T) {
+	origNew := newDriveService
+	t.Cleanup(func() { newDriveService = origNew })
+	newDriveService = func(context.Context, string) (*drive.Service, error) {
+		t.Fatalf("expected max validation to fail before creating drive service")
+		return nil, errUnexpectedDriveServiceCall
+	}
+
+	ctx := newCmdOutputContext(t, io.Discard, io.Discard)
+	flags := &RootFlags{Account: "a@example.com"}
+
+	for _, args := range [][]string{{"file1", "--max", "0"}, {"file1", "--max=-1"}} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			cmd := &DriveLabelsFileListCmd{}
+			err := runKong(t, cmd, args, ctx, flags)
+			var exitErr *ExitError
+			if !errors.As(err, &exitErr) || exitErr.Code != 2 || !strings.Contains(err.Error(), "max must be > 0") {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 

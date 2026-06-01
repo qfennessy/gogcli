@@ -57,6 +57,9 @@ func (c *DriveLabelsFileListCmd) Run(ctx context.Context, flags *RootFlags) erro
 	if fileID == "" {
 		return usage("empty fileId")
 	}
+	if c.Max <= 0 {
+		return usage("max must be > 0")
+	}
 	_, svc, err := requireDriveService(ctx, flags)
 	if err != nil {
 		return err
@@ -186,6 +189,9 @@ func (c *DriveLabelsFileRemoveCmd) Run(ctx context.Context, flags *RootFlags) er
 
 func (c *DriveLabelsListCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
+	if c.Max <= 0 {
+		return usage("max must be > 0")
+	}
 	account, err := requireAccount(flags)
 	if err != nil {
 		return err

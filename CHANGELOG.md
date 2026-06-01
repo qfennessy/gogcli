@@ -59,6 +59,7 @@
 - Drive: return usage exit code 2 for non-positive `drive changes list --max` values before auth/API setup.
 - Drive Labels: return usage exit code 2 for invalid integer field values instead of reporting them as generic runtime failures.
 - Drive Labels: return usage exit code 2 for invalid `--fields-json` values instead of reporting them as generic runtime failures.
+- Drive Labels: return usage exit code 2 for non-positive list `--max` values before auth/API setup.
 - Drive: return usage exit code 2 when `drive changes watch` receives a non-HTTPS webhook URL or negative expiration instead of accepting an invalid dry-run request.
 - Drive: validate share email and domain targets before dry-run instead of accepting invalid permission requests.
 - Drive: return usage exit code 2 for non-positive `drive comments list --max` values before auth/API setup.
