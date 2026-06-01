@@ -56,6 +56,7 @@
 - Forms: return usage exit code 2 when `forms add-question --index` is below `-1` instead of treating every negative value as append.
 - Sheets: return usage exit code 2 for explicit negative `sheets freeze --rows` and `--cols` values instead of treating `-1` as the internal unset sentinel.
 - Maps: validate invalid `--mode`, `--units`, and reverse-geocode coordinates before API-key lookup, and use a generic Maps/Places API-key setup error across Maps and Calendar Places commands.
+- MCP: fix docs examples so exact command allowlists include `mcp` and wildcard tool selectors are shell-safe.
 - Docs/Sheets/Slides: report service-specific dry-run ops for `copy` commands instead of `drive.copy`.
 - Drive Upload: return usage exit code 2 for invalid `--convert-to` values and unsupported `--convert` file types instead of reporting them as generic runtime failures.
 - Docs: return usage exit code 2 when Markdown writes contain local image references that must be hosted at a public HTTPS URL.
