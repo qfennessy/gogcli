@@ -40,7 +40,7 @@ func TestExecute_GmailLabelsGet_Text(t *testing.T) {
 
 	result := executeWithGmailTestService(
 		t,
-		[]string{"--account", "a@b.com", "gmail", "labels", "get", "INBOX"},
+		[]string{"--plain", "--account", "a@b.com", "gmail", "labels", "get", "INBOX"},
 		newGmailServiceFromServer(t, srv),
 	)
 	if result.err != nil {

@@ -274,6 +274,7 @@ func TestExecute_GmailGet_Metadata_Text(t *testing.T) {
 	defer srv.Close()
 
 	result := executeWithGmailTestService(t, []string{
+		"--plain",
 		"--account", "a@b.com",
 		"gmail", "get", "m1",
 		"--format", "metadata",

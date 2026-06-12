@@ -154,7 +154,7 @@ func TestGmailThreadGetAndAttachments_JSON(t *testing.T) {
 	}
 
 	plainOutDir := t.TempDir()
-	plainDownloadResult := executeWithGmailTestService(t, []string{"--account", "a@b.com", "gmail", "thread", "attachments", "t1", "--download", "--out-dir", plainOutDir}, svc)
+	plainDownloadResult := executeWithGmailTestService(t, []string{"--plain", "--account", "a@b.com", "gmail", "thread", "attachments", "t1", "--download", "--out-dir", plainOutDir}, svc)
 	if plainDownloadResult.err != nil {
 		t.Fatalf("Execute attachments download plain: %v\nstderr=%q", plainDownloadResult.err, plainDownloadResult.stderr)
 	}
@@ -162,7 +162,7 @@ func TestGmailThreadGetAndAttachments_JSON(t *testing.T) {
 		t.Fatalf("unexpected download output: %q", plainDownloadResult.stdout)
 	}
 
-	cachedResult := executeWithGmailTestService(t, []string{"--account", "a@b.com", "gmail", "thread", "attachments", "t1", "--download", "--out-dir", plainOutDir}, svc)
+	cachedResult := executeWithGmailTestService(t, []string{"--plain", "--account", "a@b.com", "gmail", "thread", "attachments", "t1", "--download", "--out-dir", plainOutDir}, svc)
 	if cachedResult.err != nil {
 		t.Fatalf("Execute attachments cached: %v\nstderr=%q", cachedResult.err, cachedResult.stderr)
 	}
@@ -175,7 +175,7 @@ func TestGmailThreadGetAndAttachments_JSON(t *testing.T) {
 		t.Fatalf("unexpected download path: %s", path)
 	}
 
-	plainResult := executeWithGmailTestService(t, []string{"--account", "a@b.com", "gmail", "thread", "get", "t1"}, svc)
+	plainResult := executeWithGmailTestService(t, []string{"--plain", "--account", "a@b.com", "gmail", "thread", "get", "t1"}, svc)
 	if plainResult.err != nil {
 		t.Fatalf("Execute thread get plain: %v\nstderr=%q", plainResult.err, plainResult.stderr)
 	}
@@ -183,7 +183,7 @@ func TestGmailThreadGetAndAttachments_JSON(t *testing.T) {
 		t.Fatalf("unexpected plain output: %q", plainResult.stdout)
 	}
 
-	emptyResult := executeWithGmailTestService(t, []string{"--account", "a@b.com", "gmail", "thread", "get", "empty"}, svc)
+	emptyResult := executeWithGmailTestService(t, []string{"--plain", "--account", "a@b.com", "gmail", "thread", "get", "empty"}, svc)
 	if emptyResult.err != nil {
 		t.Fatalf("Execute empty thread: %v\nstderr=%q", emptyResult.err, emptyResult.stderr)
 	}
@@ -191,7 +191,7 @@ func TestGmailThreadGetAndAttachments_JSON(t *testing.T) {
 		t.Fatalf("unexpected empty thread stderr: %q", emptyResult.stderr)
 	}
 
-	noAttsResult := executeWithGmailTestService(t, []string{"--account", "a@b.com", "gmail", "thread", "attachments", "noatts"}, svc)
+	noAttsResult := executeWithGmailTestService(t, []string{"--plain", "--account", "a@b.com", "gmail", "thread", "attachments", "noatts"}, svc)
 	if noAttsResult.err != nil {
 		t.Fatalf("Execute no attachments: %v\nstderr=%q", noAttsResult.err, noAttsResult.stderr)
 	}

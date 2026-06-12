@@ -69,7 +69,7 @@ func TestExecute_GmailMessagesSearch_Text(t *testing.T) {
 
 	result := executeWithGmailTestService(
 		t,
-		[]string{"--account", "a@b.com", "gmail", "messages", "search", "from:example.com", "--max", "2"},
+		[]string{"--plain", "--account", "a@b.com", "gmail", "messages", "search", "from:example.com", "--max", "2"},
 		newGmailServiceFromServer(t, srv),
 	)
 	if result.err != nil {
@@ -222,7 +222,7 @@ func TestExecute_GmailMessagesSearch_AppliesSystemLabelFilters(t *testing.T) {
 
 	result := executeWithGmailTestService(
 		t,
-		[]string{"--account", "a@b.com", "gmail", "messages", "search", "in:spam is:unread", "--max", "1000"},
+		[]string{"--plain", "--account", "a@b.com", "gmail", "messages", "search", "in:spam is:unread", "--max", "1000"},
 		newGmailServiceFromServer(t, srv),
 	)
 	if result.err != nil {
