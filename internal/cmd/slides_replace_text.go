@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/slides/v1"
@@ -87,7 +86,7 @@ func (c *SlidesReplaceTextCmd) Run(ctx context.Context, flags *RootFlags) error 
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, resp)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), resp)
 	}
 
 	var replaced int64

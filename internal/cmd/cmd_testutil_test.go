@@ -24,7 +24,13 @@ func newCmdOutputContext(t *testing.T, stdout, stderr io.Writer) context.Context
 
 func newCmdRuntimeOutputContext(t *testing.T, stdout, stderr io.Writer) context.Context {
 	t.Helper()
+	return newCmdRuntimeIOContext(t, strings.NewReader(""), stdout, stderr)
+}
+
+func newCmdRuntimeIOContext(t *testing.T, stdin io.Reader, stdout, stderr io.Writer) context.Context {
+	t.Helper()
 	return app.WithRuntime(newCmdOutputContext(t, stdout, stderr), &app.Runtime{IO: app.IO{
+		In:  stdin,
 		Out: stdout,
 		Err: stderr,
 	}})
