@@ -13,6 +13,7 @@ import (
 	analyticsadmin "google.golang.org/api/analyticsadmin/v1beta"
 	analyticsdata "google.golang.org/api/analyticsdata/v1beta"
 	"google.golang.org/api/chat/v1"
+	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/drive/v3"
 	formsapi "google.golang.org/api/forms/v1"
 	"google.golang.org/api/gmail/v1"
@@ -114,6 +115,31 @@ func TestAdminOrgUnitDirectoryServiceUsesRuntimeFactory(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("adminOrgUnitDirectoryService() = %p, want %p", got, want)
+	}
+	if gotAccount != "test@example.com" {
+		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
+	}
+}
+
+func TestCloudIdentityServiceUsesRuntimeFactory(t *testing.T) {
+	t.Parallel()
+
+	want := &cloudidentity.Service{}
+	var gotAccount string
+	runtime := &app.Runtime{Services: app.Services{
+		CloudIdentity: func(_ context.Context, account string) (*cloudidentity.Service, error) {
+			gotAccount = account
+			return want, nil
+		},
+	}}
+	ctx := app.WithRuntime(context.Background(), runtime)
+
+	got, err := cloudIdentityService(ctx, "test@example.com")
+	if err != nil {
+		t.Fatalf("cloudIdentityService() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("cloudIdentityService() = %p, want %p", got, want)
 	}
 	if gotAccount != "test@example.com" {
 		t.Fatalf("factory account = %q, want test@example.com", gotAccount)

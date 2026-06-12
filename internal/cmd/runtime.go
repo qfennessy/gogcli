@@ -36,14 +36,14 @@ func newDefaultRuntime() *app.Runtime {
 			Err: os.Stderr,
 		},
 		Services: app.Services{
-			AdminDirectory: newAdminDirectoryService,
-			AdminOrgUnit:   newAdminOrgUnitDirectoryService,
+			AdminDirectory: googleapi.NewAdminDirectory,
+			AdminOrgUnit:   googleapi.NewAdminDirectoryOrgUnit,
 			AnalyticsAdmin: googleapi.NewAnalyticsAdmin,
 			AnalyticsData:  googleapi.NewAnalyticsData,
 			Calendar:       googleapi.NewCalendar,
 			Chat:           googleapi.NewChat,
 			Classroom:      googleapi.NewClassroom,
-			CloudIdentity:  newCloudIdentityService,
+			CloudIdentity:  googleapi.NewCloudIdentityGroups,
 			Docs:           googleapi.NewDocs,
 			DocsHTTP: func(ctx context.Context, account string) (*http.Client, error) {
 				return googleapi.NewHTTPClient(ctx, googleauth.ServiceDocs, account)
@@ -180,14 +180,14 @@ func adminDirectoryService(ctx context.Context, account string) (*admin.Service,
 	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.AdminDirectory != nil {
 		return runtime.Services.AdminDirectory(ctx, account)
 	}
-	return newAdminDirectoryService(ctx, account)
+	return googleapi.NewAdminDirectory(ctx, account)
 }
 
 func adminOrgUnitDirectoryService(ctx context.Context, account string) (*admin.Service, error) {
 	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.AdminOrgUnit != nil {
 		return runtime.Services.AdminOrgUnit(ctx, account)
 	}
-	return newAdminOrgUnitDirectoryService(ctx, account)
+	return googleapi.NewAdminDirectoryOrgUnit(ctx, account)
 }
 
 func analyticsAdminService(ctx context.Context, account string) (*analyticsadmin.Service, error) {
@@ -229,7 +229,7 @@ func cloudIdentityService(ctx context.Context, account string) (*cloudidentity.S
 	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.CloudIdentity != nil {
 		return runtime.Services.CloudIdentity(ctx, account)
 	}
-	return newCloudIdentityService(ctx, account)
+	return googleapi.NewCloudIdentityGroups(ctx, account)
 }
 
 func driveService(ctx context.Context, account string) (*drive.Service, error) {
