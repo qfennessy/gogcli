@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -12,6 +11,7 @@ import (
 	"google.golang.org/api/drive/v3"
 	gapi "google.golang.org/api/googleapi"
 
+	"github.com/steipete/gogcli/internal/docsedit"
 	"github.com/steipete/gogcli/internal/docsmarkdown"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/ui"
@@ -165,9 +165,16 @@ func (c *DocsWriteCmd) writePlainText(ctx context.Context, flags *RootFlags, doc
 		insertIndex = docsAppendIndex(endIndex)
 	}
 
-	reqs, err := c.buildPlainWriteRequests(endIndex, insertIndex, text)
+	reqs, err := docsedit.BuildWriteRequests(docsedit.WriteOptions{
+		EndIndex:    endIndex,
+		InsertIndex: insertIndex,
+		Text:        text,
+		TabID:       c.Tab,
+		Append:      c.Append,
+		Format:      c.Format.options(),
+	})
 	if err != nil {
-		return err
+		return usage(err.Error())
 	}
 	if queued, queueErr := queueDocsBatchRequests(ctx, flags, c.Batch, docID, "docs.write", batchRevision, reqs, !c.Append); queued || queueErr != nil {
 		return queueErr
@@ -184,34 +191,6 @@ func (c *DocsWriteCmd) writePlainText(ctx context.Context, flags *RootFlags, doc
 	}
 
 	return c.writePlainTextResult(ctx, resp, len(reqs), insertIndex)
-}
-
-func (c *DocsWriteCmd) buildPlainWriteRequests(endIndex, insertIndex int64, text string) ([]*docs.Request, error) {
-	reqs := make([]*docs.Request, 0, 2)
-	if !c.Append {
-		deleteEnd := endIndex - 1
-		if deleteEnd > 1 {
-			reqs = append(reqs, &docs.Request{
-				DeleteContentRange: &docs.DeleteContentRangeRequest{
-					Range: &docs.Range{StartIndex: 1, EndIndex: deleteEnd, TabId: c.Tab},
-				},
-			})
-		}
-	}
-	reqs = append(reqs, &docs.Request{
-		InsertText: &docs.InsertTextRequest{
-			Location: &docs.Location{Index: insertIndex, TabId: c.Tab},
-			Text:     text,
-		},
-	})
-	if c.Format.any() {
-		formatReqs, err := c.Format.buildRequests(insertIndex, insertIndex+utf16Len(text), c.Tab)
-		if err != nil {
-			return nil, err
-		}
-		reqs = append(reqs, formatReqs...)
-	}
-	return reqs, nil
 }
 
 func (c *DocsWriteCmd) applyDocumentStyle(ctx context.Context, svc *docs.Service, docID string) error {
@@ -658,10 +637,11 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 		return placementErr
 	}
 
-	replaceStart, replaceEnd, replacing, err := parseDocsReplaceRange(c.ReplaceRange)
+	replaceRange, replacing, err := docsedit.ParseRange(c.ReplaceRange)
 	if err != nil {
-		return err
+		return usage(err.Error())
 	}
+	replaceStart, replaceEnd := replaceRange.Start, replaceRange.End
 
 	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
 	if tabErr != nil {
@@ -773,20 +753,11 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 		written = inserted
 		resp = &docs.BatchUpdateDocumentResponse{DocumentId: id}
 	} else {
-		reqs := make([]*docs.Request, 0, 2)
+		var targetRange *docsedit.Range
 		if replacing {
-			reqs = append(reqs, &docs.Request{
-				DeleteContentRange: &docs.DeleteContentRangeRequest{
-					Range: &docs.Range{StartIndex: replaceStart, EndIndex: replaceEnd, TabId: c.Tab},
-				},
-			})
+			targetRange = &docsedit.Range{Start: replaceStart, End: replaceEnd}
 		}
-		reqs = append(reqs, &docs.Request{
-			InsertText: &docs.InsertTextRequest{
-				Location: &docs.Location{Index: insertIndex, TabId: c.Tab},
-				Text:     text,
-			},
-		})
+		reqs := docsedit.BuildUpdateRequests(text, insertIndex, c.Tab, targetRange)
 		requestCount = len(reqs)
 		batchReq := &docs.BatchUpdateDocumentRequest{Requests: reqs}
 		if anchor != nil {
@@ -918,26 +889,6 @@ func anchorDocumentForMarkdownReplace(anchor *docsResolvedAtAnchor) *docs.Docume
 	return anchor.Document
 }
 
-func parseDocsReplaceRange(value string) (start int64, end int64, ok bool, err error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, 0, false, nil
-	}
-	parts := strings.Split(value, ":")
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return 0, 0, false, usage("invalid --replace-range (expected START:END)")
-	}
-	start, parseErr := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64)
-	if parseErr != nil || start < 1 {
-		return 0, 0, false, usage("invalid --replace-range start (must be >= 1)")
-	}
-	end, parseErr = strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
-	if parseErr != nil || end <= start {
-		return 0, 0, false, usage("invalid --replace-range end (must be greater than start)")
-	}
-	return start, end, true, nil
-}
-
 type DocsInsertCmd struct {
 	DocID      string `arg:"" name:"docId" help:"Doc ID"`
 	Content    string `arg:"" optional:"" name:"content" help:"Text to insert (or use --file / stdin)"`
@@ -1046,15 +997,7 @@ func (c *DocsInsertCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 	}
 
 	batchReq := &docs.BatchUpdateDocumentRequest{
-		Requests: []*docs.Request{{
-			InsertText: &docs.InsertTextRequest{
-				Text: content,
-				Location: &docs.Location{
-					Index: insertIndex,
-					TabId: c.Tab,
-				},
-			},
-		}},
+		Requests: []*docs.Request{docsedit.BuildInsertRequest(content, insertIndex, c.Tab)},
 	}
 	if anchor != nil {
 		batchReq.WriteControl = docsRequiredRevisionWriteControl(anchor.RevisionID)
@@ -1178,11 +1121,7 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 	}
 
 	batchReq := &docs.BatchUpdateDocumentRequest{
-		Requests: []*docs.Request{{
-			DeleteContentRange: &docs.DeleteContentRangeRequest{
-				Range: &docs.Range{StartIndex: start, EndIndex: end, TabId: c.Tab},
-			},
-		}},
+		Requests: []*docs.Request{docsedit.BuildDeleteRequest(docsedit.Range{Start: start, End: end}, c.Tab)},
 	}
 	if anchor != nil {
 		batchReq.WriteControl = docsRequiredRevisionWriteControl(anchor.RevisionID)
