@@ -14,7 +14,7 @@ import (
 )
 
 func requireDocsService(ctx context.Context, flags *RootFlags) (*docs.Service, error) {
-	_, svc, err := requireGoogleService(ctx, flags, newDocsService)
+	_, svc, err := requireGoogleService(ctx, flags, docsService)
 	if err != nil {
 		return nil, err
 	}
