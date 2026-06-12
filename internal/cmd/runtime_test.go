@@ -18,6 +18,7 @@ import (
 	formsapi "google.golang.org/api/forms/v1"
 	"google.golang.org/api/gmail/v1"
 	keepapi "google.golang.org/api/keep/v1"
+	meetapi "google.golang.org/api/meet/v2"
 	"google.golang.org/api/people/v1"
 	scriptapi "google.golang.org/api/script/v1"
 	searchconsoleapi "google.golang.org/api/searchconsole/v1"
@@ -198,6 +199,31 @@ func TestKeepServiceUsesRuntimeFactory(t *testing.T) {
 	}
 	if gotPath != "/tmp/service-account.json" || gotImpersonate != "test@example.com" {
 		t.Fatalf("factory args = (%q, %q)", gotPath, gotImpersonate)
+	}
+}
+
+func TestMeetServiceUsesRuntimeFactory(t *testing.T) {
+	t.Parallel()
+
+	want := &meetapi.Service{}
+	var gotAccount string
+	runtime := &app.Runtime{Services: app.Services{
+		Meet: func(_ context.Context, account string) (*meetapi.Service, error) {
+			gotAccount = account
+			return want, nil
+		},
+	}}
+	ctx := app.WithRuntime(context.Background(), runtime)
+
+	got, err := meetService(ctx, "test@example.com")
+	if err != nil {
+		t.Fatalf("meetService() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("meetService() = %p, want %p", got, want)
+	}
+	if gotAccount != "test@example.com" {
+		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
 	}
 }
 
