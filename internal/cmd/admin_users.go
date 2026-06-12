@@ -239,67 +239,24 @@ type AdminUsersCreateCmd struct {
 }
 
 func (c *AdminUsersCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
-	email := strings.TrimSpace(c.Email)
-	givenName := strings.TrimSpace(c.GivenName)
-	familyName := strings.TrimSpace(c.FamilyName)
-	password := strings.TrimSpace(c.Password)
-	if email == "" {
-		return usage("email required")
-	}
-	if err := validatePlainEmail("email", email); err != nil {
-		return err
-	}
-	if givenName == "" {
-		return usage("--given required")
-	}
-	if familyName == "" {
-		return usage("--family required")
-	}
-	if c.Admin {
-		return usage("--admin is not supported; assign admin roles separately after user creation")
-	}
-	hashFunction, err := normalizeAdminUserHashFunction(c.HashFunction)
+	plan, err := newAdminUserCreatePlan(adminUserCreateInput{
+		Email:         c.Email,
+		GivenName:     c.GivenName,
+		FamilyName:    c.FamilyName,
+		Password:      c.Password,
+		ChangePwd:     c.ChangePwd,
+		OrgUnit:       c.OrgUnit,
+		Suspended:     c.Suspended,
+		Archived:      c.Archived,
+		RecoveryEmail: c.RecoveryEmail,
+		RecoveryPhone: c.RecoveryPhone,
+		HashFunction:  c.HashFunction,
+		Admin:         c.Admin,
+	})
 	if err != nil {
 		return err
 	}
-	if hashFunction != "" && password == "" {
-		return usage("--password required when --hash-function is set")
-	}
-
-	dryRunUser := &admin.User{
-		PrimaryEmail: email,
-		Name: &admin.UserName{
-			GivenName:  givenName,
-			FamilyName: familyName,
-		},
-		ChangePasswordAtNextLogin: c.ChangePwd || password == "",
-		Suspended:                 c.Suspended,
-		Archived:                  c.Archived,
-	}
-	if c.OrgUnit != "" {
-		dryRunUser.OrgUnitPath = strings.TrimSpace(c.OrgUnit)
-	}
-	if c.RecoveryEmail != "" {
-		recoveryEmail := strings.TrimSpace(c.RecoveryEmail)
-		if emailErr := validatePlainEmail("--recovery-email", recoveryEmail); emailErr != nil {
-			return emailErr
-		}
-		dryRunUser.RecoveryEmail = recoveryEmail
-	}
-	if c.RecoveryPhone != "" {
-		dryRunUser.RecoveryPhone = strings.TrimSpace(c.RecoveryPhone)
-	}
-	if hashFunction != "" {
-		dryRunUser.HashFunction = hashFunction
-	}
-	passwordState := "provided"
-	if password == "" {
-		passwordState = "generated"
-	}
-	if dryRunErr := dryRunExit(ctx, flags, "admin.users.create", map[string]any{
-		"user":     dryRunUser,
-		"password": passwordState,
-	}); dryRunErr != nil {
+	if dryRunErr := dryRunExit(ctx, flags, "admin.users.create", plan.dryRunPayload()); dryRunErr != nil {
 		return dryRunErr
 	}
 
@@ -308,37 +265,12 @@ func (c *AdminUsersCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	generatedPassword := false
-	if password == "" {
+	password := plan.Password
+	if plan.GeneratePassword {
 		password, err = generateAdminUserPassword(16)
 		if err != nil {
 			return fmt.Errorf("generate password: %w", err)
 		}
-		generatedPassword = true
-	}
-
-	user := &admin.User{
-		PrimaryEmail: email,
-		Name: &admin.UserName{
-			GivenName:  givenName,
-			FamilyName: familyName,
-		},
-		Password:                  password,
-		ChangePasswordAtNextLogin: c.ChangePwd || generatedPassword,
-		Suspended:                 c.Suspended,
-		Archived:                  c.Archived,
-	}
-	if c.OrgUnit != "" {
-		user.OrgUnitPath = strings.TrimSpace(c.OrgUnit)
-	}
-	if c.RecoveryEmail != "" {
-		user.RecoveryEmail = strings.TrimSpace(c.RecoveryEmail)
-	}
-	if c.RecoveryPhone != "" {
-		user.RecoveryPhone = strings.TrimSpace(c.RecoveryPhone)
-	}
-	if hashFunction != "" {
-		user.HashFunction = hashFunction
 	}
 
 	svc, err := adminDirectoryService(ctx, account)
@@ -346,20 +278,16 @@ func (c *AdminUsersCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return wrapAdminDirectoryError(err, account)
 	}
 
-	created, err := svc.Users.Insert(user).Context(ctx).Do()
+	created, err := svc.Users.Insert(plan.insertRequest(password)).Context(ctx).Do()
 	if err != nil {
 		return wrapAdminDirectoryError(err, account)
 	}
-	if c.Suspended || c.Archived {
+	if plan.StatePatch != nil {
 		userKey := created.PrimaryEmail
 		if strings.TrimSpace(userKey) == "" {
-			userKey = email
+			userKey = plan.Email
 		}
-		statePatch := &admin.User{
-			Suspended: c.Suspended,
-			Archived:  c.Archived,
-		}
-		updated, patchErr := patchAdminUserState(ctx, svc, userKey, statePatch)
+		updated, patchErr := patchAdminUserState(ctx, svc, userKey, plan.StatePatch)
 		if patchErr != nil {
 			return wrapAdminDirectoryError(patchErr, account)
 		}
@@ -373,7 +301,7 @@ func (c *AdminUsersCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 			"suspended": created.Suspended,
 			"archived":  created.Archived,
 		}
-		if generatedPassword {
+		if plan.GeneratePassword {
 			result["generatedPassword"] = password
 		}
 		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), result)
@@ -381,7 +309,7 @@ func (c *AdminUsersCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	u := ui.FromContext(ctx)
 	u.Out().Linef("Created user: %s (ID: %s)", created.PrimaryEmail, created.Id)
-	if generatedPassword {
+	if plan.GeneratePassword {
 		u.Out().Linef("Generated password: %s", password)
 	}
 	return nil
