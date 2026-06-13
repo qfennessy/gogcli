@@ -301,7 +301,10 @@ completed backup waits for the queue to drain, then promotes the completed
 checkpoint message shards into the root manifest instead of re-encrypting the
 same mailbox into a second multi-GB final push. If no complete matching
 checkpoint exists, final Gmail message shards still split by row count and the
-same conservative plaintext byte ceiling. Tune the commit cadence with
+same conservative plaintext byte ceiling. Checkpoint reuse fingerprints the
+exact ordered Gmail message IDs and requires the manifest run, service,
+account, row count, and encryption recipients to remain compatible. Tune the
+commit cadence with
 `--gmail-checkpoint-rows` /
 `--gmail-checkpoint-interval` on `gog backup push`, or `--checkpoint-rows` /
 `--checkpoint-interval` on `gog backup gmail push`; set the interval or rows to

@@ -17,6 +17,7 @@
 - Calendar: remove the dead `calendar appointments` command, which could only report an API limitation; existing invocations now return unknown-command usage, while the limitation remains documented.
 - Drive: preserve repeated folder placements in tree, inventory, and size summaries; reject cyclic folder graphs instead of collapsing paths or scanning indefinitely.
 - Backup: bind configuration, legacy fallback, and home expansion to the selected runtime layout instead of process-global path state.
+- Backup: require the exact Gmail message selection and run identity before reusing or promoting encrypted checkpoints, preventing stale same-count mailbox checkpoints from becoming the completed snapshot.
 - Classroom: require an archived course before deletion with actionable lifecycle guidance, and prevent live tests from leaving consumer-account courses behind.
 - Classroom: wait for course state changes to become readable before reporting success, so immediate archive-then-delete workflows do not fail on stale state.
 - Forms: validate scale question bounds locally and document the Forms API's accepted minimum and maximum values.
