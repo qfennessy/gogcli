@@ -80,6 +80,16 @@ func withTestClientResolver(ctx context.Context) context.Context {
 	})
 }
 
+func defaultConfigStoreForTest(t *testing.T) *config.ConfigStore {
+	t.Helper()
+
+	store, err := config.DefaultConfigStore()
+	if err != nil {
+		t.Fatalf("config.DefaultConfigStore: %v", err)
+	}
+	return store
+}
+
 func withAuthStore(ctx context.Context, store secrets.Store) context.Context {
 	return withTestRuntime(ctx, func(runtime *app.Runtime) {
 		runtime.Auth.OpenSecretsStore = func() (secrets.Store, error) {
