@@ -58,6 +58,43 @@ func newGmailEmptyListTestService(t *testing.T, path, key string) *gmail.Service
 	return svc
 }
 
+type gmailTestHeader struct {
+	Name  string
+	Value string
+}
+
+type gmailTestMessage struct {
+	ThreadID string
+	Headers  []gmailTestHeader
+}
+
+func newGmailMessagesTestService(t *testing.T, messages map[string]gmailTestMessage) *gmail.Service {
+	t.Helper()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/gmail/v1/users/me/messages/") {
+			http.NotFound(w, r)
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/gmail/v1/users/me/messages/")
+		message, ok := messages[id]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		headers := make([]map[string]any, 0, len(message.Headers))
+		for _, header := range message.Headers {
+			headers = append(headers, map[string]any{"name": header.Name, "value": header.Value})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": id, "threadId": message.ThreadID, "payload": map[string]any{"headers": headers},
+		})
+	})
+	svc, closeServer := newGoogleTestService(t, handler, gmail.NewService)
+	t.Cleanup(closeServer)
+	return svc
+}
+
 func newGmailServiceForTest(t *testing.T, h http.HandlerFunc) (*gmail.Service, func()) {
 	t.Helper()
 

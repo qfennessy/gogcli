@@ -36,49 +36,15 @@ func runGmailSendJSON(t *testing.T, cmd *GmailSendCmd, gmailSvc *gmail.Service, 
 }
 
 func TestReplyHeaders(t *testing.T) {
-	type hdr struct {
-		Name  string
-		Value string
-	}
-	type msg struct {
-		ThreadID string
-		Headers  []hdr
-	}
-
-	messages := map[string]msg{
-		"m1": {ThreadID: "t1", Headers: []hdr{{Name: "Message-ID", Value: "<id1@example.com>"}}},
-		"m2": {ThreadID: "t2", Headers: []hdr{
+	messages := map[string]gmailTestMessage{
+		"m1": {ThreadID: "t1", Headers: []gmailTestHeader{{Name: "Message-ID", Value: "<id1@example.com>"}}},
+		"m2": {ThreadID: "t2", Headers: []gmailTestHeader{
 			{Name: "Message-Id", Value: "<id2@example.com>"},
 			{Name: "References", Value: "<ref@example.com>"},
 		}},
 	}
 
-	svc, cleanup := newGmailServiceForTest(t, func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/gmail/v1/users/me/messages/") {
-			http.NotFound(w, r)
-			return
-		}
-		id := strings.TrimPrefix(r.URL.Path, "/gmail/v1/users/me/messages/")
-		m, ok := messages[id]
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		hs := make([]map[string]any, 0, len(m.Headers))
-		for _, h := range m.Headers {
-			hs = append(hs, map[string]any{"name": h.Name, "value": h.Value})
-		}
-		resp := map[string]any{
-			"id":       id,
-			"threadId": m.ThreadID,
-			"payload": map[string]any{
-				"headers": hs,
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	})
-	defer cleanup()
+	svc := newGmailMessagesTestService(t, messages)
 
 	ctx := context.Background()
 
@@ -1175,19 +1141,10 @@ func TestBuildReplyAllRecipients(t *testing.T) {
 }
 
 func TestFetchReplyInfo(t *testing.T) {
-	type hdr struct {
-		Name  string
-		Value string
-	}
-	type msg struct {
-		ThreadID string
-		Headers  []hdr
-	}
-
-	messages := map[string]msg{
+	messages := map[string]gmailTestMessage{
 		"m1": {
 			ThreadID: "t1",
-			Headers: []hdr{
+			Headers: []gmailTestHeader{
 				{Name: "Message-ID", Value: "<id1@example.com>"},
 				{Name: "From", Value: "sender@example.com"},
 				{Name: "To", Value: "alice@example.com, bob@example.com"},
@@ -1196,7 +1153,7 @@ func TestFetchReplyInfo(t *testing.T) {
 		},
 		"m2": {
 			ThreadID: "t2",
-			Headers: []hdr{
+			Headers: []gmailTestHeader{
 				{Name: "Message-ID", Value: "<id2@example.com>"},
 				{Name: "From", Value: `"Sender Name" <sender@example.com>`},
 				{Name: "To", Value: "recipient@example.com"},
@@ -1204,7 +1161,7 @@ func TestFetchReplyInfo(t *testing.T) {
 		},
 		"m3": {
 			ThreadID: "t3",
-			Headers: []hdr{
+			Headers: []gmailTestHeader{
 				{Name: "Message-ID", Value: "<id3@example.com>"},
 				{Name: "From", Value: "original-sender@example.com"},
 				{Name: "Reply-To", Value: "Mailing List <list@example.com>"},
@@ -1213,34 +1170,7 @@ func TestFetchReplyInfo(t *testing.T) {
 		},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/gmail/v1/users/me/messages/") {
-			http.NotFound(w, r)
-			return
-		}
-		id := strings.TrimPrefix(r.URL.Path, "/gmail/v1/users/me/messages/")
-		m, ok := messages[id]
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		hs := make([]map[string]any, 0, len(m.Headers))
-		for _, h := range m.Headers {
-			hs = append(hs, map[string]any{"name": h.Name, "value": h.Value})
-		}
-		resp := map[string]any{
-			"id":       id,
-			"threadId": m.ThreadID,
-			"payload": map[string]any{
-				"headers": hs,
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	svc := newGmailServiceFromServer(t, srv)
+	svc := newGmailMessagesTestService(t, messages)
 
 	ctx := context.Background()
 

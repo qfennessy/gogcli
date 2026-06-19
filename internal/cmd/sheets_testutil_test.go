@@ -89,6 +89,38 @@ func sheetsEmptyAnnotationsHandler() http.Handler {
 	})
 }
 
+func sheetsAnnotationsHandler(rows [][]map[string]any) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/sheets/v4"), "/v4")
+		if !strings.HasPrefix(path, "/spreadsheets/s1") || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("includeGridData") != "true" {
+			http.Error(w, "expected includeGridData=true", http.StatusBadRequest)
+			return
+		}
+
+		startRow, startCol := 0, 0
+		if strings.Contains(r.URL.Query().Get("ranges"), "B2") {
+			startRow, startCol = 1, 1
+		}
+		rowData := make([]map[string]any, 0, len(rows))
+		for _, values := range rows {
+			rowData = append(rowData, map[string]any{"values": values})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sheets": []map[string]any{{
+				"properties": map[string]any{"title": "Sheet1"},
+				"data": []map[string]any{{
+					"startRow": startRow, "startColumn": startCol, "rowData": rowData,
+				}},
+			}},
+		})
+	})
+}
+
 func assertSheetsNoAnnotations(
 	t *testing.T,
 	cmd any,
@@ -103,6 +135,57 @@ func assertSheetsNoAnnotations(
 	}
 	if !strings.Contains(stderr.String(), want) {
 		t.Errorf("expected %q on stderr: %q", want, stderr.String())
+	}
+}
+
+func assertSheetsOffsetAnnotations(
+	t *testing.T,
+	cmd any,
+	handler http.Handler,
+	newContext func(*testing.T, http.Handler, bool) (context.Context, *bytes.Buffer, *bytes.Buffer),
+	resultKey string,
+) {
+	t.Helper()
+	ctx, output, _ := newContext(t, handler, true)
+	if err := runKong(t, cmd, []string{"s1", "Sheet1!B2:C3"}, ctx, &RootFlags{Account: "a@b.com"}); err != nil {
+		t.Fatalf("read annotations: %v", err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v (output: %q)", err, output.String())
+	}
+	first := result[resultKey].([]any)[0].(map[string]any)
+	if first["a1"] != "Sheet1!B2" || first["row"] != float64(2) || first["col"] != float64(2) {
+		t.Errorf("unexpected offset annotation: %#v", first)
+	}
+}
+
+func assertSheetsAnnotationsJSON(
+	t *testing.T,
+	cmd any,
+	handler http.Handler,
+	newContext func(*testing.T, http.Handler, bool) (context.Context, *bytes.Buffer, *bytes.Buffer),
+	resultKey, field, wantField, wantValue string,
+) {
+	t.Helper()
+	ctx, output, _ := newContext(t, handler, true)
+	if err := runKong(t, cmd, []string{"s1", "Sheet1!A1:B3"}, ctx, &RootFlags{Account: "a@b.com"}); err != nil {
+		t.Fatalf("read annotations: %v", err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v (output: %q)", err, output.String())
+	}
+	items, ok := result[resultKey].([]any)
+	if !ok || len(items) != 3 {
+		t.Fatalf("expected 3 %s, got %#v", resultKey, result[resultKey])
+	}
+	first := items[0].(map[string]any)
+	if first["sheet"] != "Sheet1" || first["a1"] != "Sheet1!A1" || first["row"] != float64(1) || first["col"] != float64(1) {
+		t.Errorf("unexpected annotation position: %#v", first)
+	}
+	if first[field] != wantField || first["value"] != wantValue {
+		t.Errorf("unexpected annotation content: %#v", first)
 	}
 }
 
