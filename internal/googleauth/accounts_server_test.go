@@ -316,6 +316,10 @@ func TestManagerApplicationHandlerRoutes(t *testing.T) {
 	app := newTestManagerApplication(t, ManagerOptions{}, ManagerDependencies{})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/accounts", nil)
+	// The manager's loopback Host guard runs through Handler(); a real browser
+	// request targets the loopback listener, so set a loopback Host (httptest
+	// otherwise defaults Host to "example.com", which the guard rejects).
+	req.Host = "127.0.0.1:8080"
 	app.Handler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {

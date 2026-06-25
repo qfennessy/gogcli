@@ -150,9 +150,34 @@ func NewManagerApplication(opts ManagerOptions, deps ManagerDependencies) (*Mana
 	mux.HandleFunc("/oauth2/callback", app.handleOAuthCallback)
 	mux.HandleFunc("/set-default", app.handleSetDefault)
 	mux.HandleFunc("/remove-account", app.handleRemoveAccount)
-	app.handler = mux
+	app.handler = app.secureManagerHandler(mux)
 
 	return app, nil
+}
+
+// secureManagerHandler hardens the loopback-only management server. It rejects
+// requests whose Host header is not loopback (blocking DNS-rebinding from a page
+// the user is visiting) and sets Referrer-Policy: no-referrer so the CSRF token
+// carried in management URLs cannot leak to third parties via the Referer header
+// on the subsequent Google OAuth redirect. The Host check is skipped when an
+// explicit RedirectURI override is configured, since that means the operator is
+// deliberately fronting the server (e.g. behind a reverse proxy).
+func (app *ManagerApplication) secureManagerHandler(next http.Handler) http.Handler {
+	// The launcher always populates RedirectURI (it defaults to a listener-derived
+	// loopback URL), so a loopback redirect host marks the default local flow and a
+	// non-loopback host marks a deliberately fronted server. Enforce the Host guard
+	// only in the former.
+	enforceLoopbackHost := redirectURIIsLoopback(app.opts.RedirectURI)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if enforceLoopbackHost && !requestHostIsLoopback(r.Host) {
+			http.Error(w, "forbidden: management server only accepts loopback Host headers", http.StatusForbidden)
+			return
+		}
+
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Handler returns the accounts manager HTTP handler.

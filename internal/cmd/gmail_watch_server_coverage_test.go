@@ -518,7 +518,7 @@ func TestParsePubSubPush_ReadError(t *testing.T) {
 func TestGmailWatchServer_OIDCAudience_Explicit(t *testing.T) {
 	s := &gmailWatchServer{cfg: gmailWatchServeConfig{OIDCAudience: "https://example.com/hook"}}
 	r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "http://ignored/hook", nil)
-	if got := gmailwatch.Audience(r, s.cfg.OIDCAudience); got != "https://example.com/hook" {
+	if got := gmailwatch.Audience(r, s.cfg.OIDCAudience, s.cfg.TrustForwarded); got != "https://example.com/hook" {
 		t.Fatalf("unexpected audience: %q", got)
 	}
 }

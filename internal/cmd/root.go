@@ -40,7 +40,7 @@ type RootFlags struct {
 	EnableCommandsExact string `name:"enable-commands-exact" help:"Comma-separated list of exact enabled commands; dot paths allowed and parent commands do not enable children" default:"${enabled_commands_exact}"`
 	DisableCommands     string `help:"Comma-separated list of disabled commands; dot paths allowed" default:"${disabled_commands}"`
 	GmailNoSend         bool   `help:"Block Gmail send operations (agent safety)" default:"${gmail_no_send}"`
-	ReadOnly            bool   `name:"readonly" help:"Block mutating API requests at runtime; auth add also requests read-only OAuth scopes" default:"${readonly}"`
+	ReadOnly            bool   `name:"readonly" help:"Block mutating API requests at runtime; auth add also requests read-only OAuth scopes. GOG_READONLY=1 forces this on (an explicit --readonly=false cannot override it)" default:"${readonly}"`
 	JSON                bool   `help:"Output JSON to stdout (best for scripting)" default:"${json}" aliases:"machine" short:"j"`
 	Plain               bool   `help:"Output stable, parseable text to stdout (TSV; no colors)" default:"${plain}" aliases:"tsv" short:"p"`
 	WrapUntrusted       bool   `name:"wrap-untrusted" help:"In JSON/raw output, wrap fetched text fields in external untrusted-content markers" default:"${wrap_untrusted}"`
@@ -206,6 +206,13 @@ func executeWithRuntime(args []string, runtime *app.Runtime) (err error) {
 
 	ctx := context.Background()
 	ctx = app.WithRuntime(ctx, runtime)
+	// GOG_READONLY is a floor, not merely a flag default: an explicit
+	// --readonly=false must not be able to downgrade an environment (or agent
+	// harness) that pins read-only. Bound before kctx.Bind below, so every
+	// command observes the forced value via its *RootFlags.
+	if envBool("GOG_READONLY") {
+		cli.ReadOnly = true
+	}
 	ctx = googleapi.WithReadOnly(ctx, cli.ReadOnly)
 	runtimeContext := ctx
 	serviceAccounts := func() (*config.ServiceAccountStore, error) {

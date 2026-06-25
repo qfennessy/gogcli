@@ -82,7 +82,7 @@ func OpenOptionsFromLookup(
 		Backend:            backend,
 		Password:           password,
 		PasswordSet:        passwordSet,
-		AllowEmptyPassword: truthyEnvValue(allowEmptyRaw),
+		AllowEmptyPassword: TruthyEnvValue(allowEmptyRaw),
 		ServiceName:        strings.TrimSpace(serviceName),
 		GOOS:               goos,
 		DBusAddress:        dbusAddress,
@@ -163,11 +163,14 @@ func fileKeyringPasswordFuncFrom(password string, passwordSet, isTTY, allowEmpty
 	}
 }
 
-// truthyEnvValue reports whether an environment-variable value should be treated
-// as enabling a boolean flag.
-func truthyEnvValue(raw string) bool {
+// TruthyEnvValue reports whether an environment-variable value should be treated
+// as enabling a boolean flag. It is exported so callers that diagnose keyring
+// configuration (e.g. `auth doctor`) parse GOG_ALLOW_EMPTY_KEYRING_PASSWORD
+// identically to the keyring open path, rather than via a separate helper that
+// could accept a different set of tokens. The accepted set matches cmd.envBool.
+func TruthyEnvValue(raw string) bool {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "1", "true", "yes", "on":
+	case "1", "true", "yes", "y", "on":
 		return true
 	default:
 		return false

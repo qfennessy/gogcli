@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -58,6 +59,47 @@ func listenerURLHost(addr *net.TCPAddr) string {
 	}
 
 	return addr.IP.String()
+}
+
+// redirectURIIsLoopback reports whether a resolved redirect URI points at a
+// loopback host. The accounts manager always carries a non-empty RedirectURI
+// (the launcher defaults it to a listener-derived loopback URL), so emptiness
+// cannot signal "not fronted"; instead, a loopback redirect host means the
+// default local flow (enforce the Host guard) and a non-loopback host means the
+// operator is deliberately fronting the server via --redirect-uri/--redirect-host
+// (skip the guard).
+func redirectURIIsLoopback(redirectURI string) bool {
+	u, err := url.Parse(strings.TrimSpace(redirectURI))
+	if err != nil || u.Host == "" {
+		return false
+	}
+
+	return requestHostIsLoopback(u.Host)
+}
+
+// requestHostIsLoopback reports whether an HTTP request's Host header refers to
+// a loopback address. Used to reject DNS-rebinding requests against the
+// loopback-only management server: a page the victim is visiting can point an
+// attacker-controlled hostname at 127.0.0.1, but the browser still sends that
+// hostname in the Host header, which a loopback literal check rejects.
+func requestHostIsLoopback(hostHeader string) bool {
+	host := strings.TrimSpace(hostHeader)
+	if host == "" {
+		return false
+	}
+
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+
+	return ip != nil && ip.IsLoopback()
 }
 
 func isLoopbackListenAddr(listenAddr string) (bool, error) {

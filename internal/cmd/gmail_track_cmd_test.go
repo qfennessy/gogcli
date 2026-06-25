@@ -55,6 +55,25 @@ func TestGmailTrackKeyRotate_ReadonlyBlocksDeploy(t *testing.T) {
 	}
 }
 
+func TestReadOnlyEnvIsFloor(t *testing.T) {
+	setupTrackingEnv(t)
+	t.Setenv("GOG_READONLY", "1")
+
+	// GOG_READONLY=1 must force read-only even when --readonly=false is passed
+	// explicitly, so the subprocess deploy guard still fires.
+	err := Execute([]string{
+		"--readonly=false",
+		"--account", "a@b.com",
+		"--no-input",
+		"gmail", "track", "setup",
+		"--worker-url", "https://example.com",
+		"--deploy",
+	})
+	if !errors.Is(err, googleapi.ErrReadOnly) {
+		t.Fatalf("GOG_READONLY floor should force read-only despite --readonly=false; got: %v", err)
+	}
+}
+
 var errUnexpectedTrackingSecretStoreOpen = errors.New("unexpected tracking secret store open")
 
 func setupTrackingEnv(t *testing.T) {

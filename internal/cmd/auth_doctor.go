@@ -168,7 +168,7 @@ func addKeyringEnvChecks(ctx context.Context, add func(string, string, string, s
 	}
 
 	password, passwordSet := os.LookupEnv("GOG_KEYRING_PASSWORD")
-	allowEmpty := envBool("GOG_ALLOW_EMPTY_KEYRING_PASSWORD")
+	allowEmpty := secrets.TruthyEnvValue(os.Getenv("GOG_ALLOW_EMPTY_KEYRING_PASSWORD"))
 	likelyFile := backendInfo.Value == strFile || (runtime.GOOS == "linux" && backendInfo.Value == "auto" && os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "")
 	if !likelyFile {
 		return

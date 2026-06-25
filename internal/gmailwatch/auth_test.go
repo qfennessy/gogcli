@@ -53,11 +53,17 @@ func TestAudienceUsesForwardedHeaders(t *testing.T) {
 	request.Header.Set("X-Forwarded-Proto", "https, http")
 	request.Header.Set("X-Forwarded-Host", "proxy.example.com, example.com")
 
-	if got := Audience(request, ""); got != "https://proxy.example.com/hook" {
-		t.Fatalf("audience = %q", got)
+	// Forwarded headers are honored only when explicitly trusted.
+	if got := Audience(request, "", true); got != "https://proxy.example.com/hook" {
+		t.Fatalf("trusted forwarded audience = %q", got)
 	}
 
-	if got := Audience(request, "https://explicit.example/hook"); got != "https://explicit.example/hook" {
+	// By default the attacker-controllable forwarded headers are ignored.
+	if got := Audience(request, "", false); got != "http://example.com/hook" {
+		t.Fatalf("untrusted audience = %q", got)
+	}
+
+	if got := Audience(request, "https://explicit.example/hook", false); got != "https://explicit.example/hook" {
 		t.Fatalf("explicit audience = %q", got)
 	}
 }
