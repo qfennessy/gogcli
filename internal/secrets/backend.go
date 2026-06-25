@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	keyringPasswordEnv    = "GOG_KEYRING_PASSWORD" //nolint:gosec // env var name, not a credential
-	keyringBackendEnv     = "GOG_KEYRING_BACKEND"  //nolint:gosec // env var name, not a credential
-	keyringServiceNameEnv = "GOG_KEYRING_SERVICE_NAME"
-	keyringOpenTimeoutEnv = "GOG_KEYRING_OPEN_TIMEOUT"
+	keyringPasswordEnv           = "GOG_KEYRING_PASSWORD" //nolint:gosec // env var name, not a credential
+	keyringBackendEnv            = "GOG_KEYRING_BACKEND"  //nolint:gosec // env var name, not a credential
+	keyringServiceNameEnv        = "GOG_KEYRING_SERVICE_NAME"
+	keyringOpenTimeoutEnv        = "GOG_KEYRING_OPEN_TIMEOUT"
+	keyringAllowEmptyPasswordEnv = "GOG_ALLOW_EMPTY_KEYRING_PASSWORD" //nolint:gosec // env var name, not a credential
 )
 
 var (
@@ -24,6 +25,7 @@ var (
 	errInvalidKeyringBackend = errors.New("invalid keyring backend")
 	errKeyringTimeout        = errors.New("keyring connection timed out")
 	errNilConfigStore        = errors.New("config store is nil")
+	errEmptyKeyringPassword  = errors.New("file keyring password is empty (an empty passphrase leaves the on-disk keyring effectively unencrypted)")
 )
 
 type KeyringBackendInfo struct {
@@ -32,18 +34,19 @@ type KeyringBackendInfo struct {
 }
 
 type OpenOptions struct {
-	Layout        config.Layout
-	Config        *config.ConfigStore
-	Backend       string
-	Password      string
-	PasswordSet   bool
-	ServiceName   string
-	GOOS          string
-	DBusAddress   string
-	IsTTY         bool
-	OpenTimeout   time.Duration
-	LockTimeout   time.Duration
-	openKeyringFn func(keyring.Config) (keyring.Keyring, error)
+	Layout             config.Layout
+	Config             *config.ConfigStore
+	Backend            string
+	Password           string
+	PasswordSet        bool
+	AllowEmptyPassword bool
+	ServiceName        string
+	GOOS               string
+	DBusAddress        string
+	IsTTY              bool
+	OpenTimeout        time.Duration
+	LockTimeout        time.Duration
+	openKeyringFn      func(keyring.Config) (keyring.Keyring, error)
 }
 
 const (
@@ -71,19 +74,21 @@ func OpenOptionsFromLookup(
 	dbusAddress, _ := lookup("DBUS_SESSION_BUS_ADDRESS")
 	openTimeoutRaw, _ := lookup(keyringOpenTimeoutEnv)
 	lockTimeoutRaw, _ := lookup(keyringLockTimeoutEnv)
+	allowEmptyRaw, _ := lookup(keyringAllowEmptyPasswordEnv)
 
 	return OpenOptions{
-		Layout:      layout,
-		Config:      store,
-		Backend:     backend,
-		Password:    password,
-		PasswordSet: passwordSet,
-		ServiceName: strings.TrimSpace(serviceName),
-		GOOS:        goos,
-		DBusAddress: dbusAddress,
-		IsTTY:       isTTY,
-		OpenTimeout: parseKeyringOpenTimeout(openTimeoutRaw, goos),
-		LockTimeout: parseKeyringLockTimeout(lockTimeoutRaw),
+		Layout:             layout,
+		Config:             store,
+		Backend:            backend,
+		Password:           password,
+		PasswordSet:        passwordSet,
+		AllowEmptyPassword: TruthyEnvValue(allowEmptyRaw),
+		ServiceName:        strings.TrimSpace(serviceName),
+		GOOS:               goos,
+		DBusAddress:        dbusAddress,
+		IsTTY:              isTTY,
+		OpenTimeout:        parseKeyringOpenTimeout(openTimeoutRaw, goos),
+		LockTimeout:        parseKeyringLockTimeout(lockTimeoutRaw),
 	}
 }
 
@@ -136,9 +141,16 @@ func wrapKeychainError(err error) error {
 	return err
 }
 
-func fileKeyringPasswordFuncFrom(password string, passwordSet bool, isTTY bool) keyring.PromptFunc {
-	// Treat "set to empty string" as intentional; empty passphrase is valid.
+func fileKeyringPasswordFuncFrom(password string, passwordSet, isTTY, allowEmpty bool) keyring.PromptFunc {
 	if passwordSet {
+		// An empty passphrase yields a file keyring that is effectively
+		// unencrypted, so reject it unless the operator explicitly opted in.
+		if password == "" && !allowEmpty {
+			return func(_ string) (string, error) {
+				return "", fmt.Errorf("%w; set a non-empty %s, or set %s=1 to accept an unencrypted file keyring", errEmptyKeyringPassword, keyringPasswordEnv, keyringAllowEmptyPasswordEnv)
+			}
+		}
+
 		return keyring.FixedStringPrompt(password)
 	}
 
@@ -148,6 +160,20 @@ func fileKeyringPasswordFuncFrom(password string, passwordSet bool, isTTY bool) 
 
 	return func(_ string) (string, error) {
 		return "", fmt.Errorf("%w; set %s", errNoTTY, keyringPasswordEnv)
+	}
+}
+
+// TruthyEnvValue reports whether an environment-variable value should be treated
+// as enabling a boolean flag. It is exported so callers that diagnose keyring
+// configuration (e.g. `auth doctor`) parse GOG_ALLOW_EMPTY_KEYRING_PASSWORD
+// identically to the keyring open path, rather than via a separate helper that
+// could accept a different set of tokens. The accepted set matches cmd.envBool.
+func TruthyEnvValue(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -270,7 +296,7 @@ func openKeyringWithOptions(options OpenOptions) (keyring.Keyring, error) {
 		KeychainTrustApplication: false,
 		AllowedBackends:          backends,
 		FileDir:                  keyringDir,
-		FilePasswordFunc:         fileKeyringPasswordFuncFrom(options.Password, options.PasswordSet, options.IsTTY),
+		FilePasswordFunc:         fileKeyringPasswordFuncFrom(options.Password, options.PasswordSet, options.IsTTY, options.AllowEmptyPassword),
 	}
 
 	openTimeout := options.OpenTimeout

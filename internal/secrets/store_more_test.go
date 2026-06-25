@@ -176,23 +176,29 @@ func TestWrapKeychainError(t *testing.T) {
 
 func TestFileKeyringPasswordFuncFrom(t *testing.T) {
 	// Non-empty password with passwordSet=true returns that password.
-	fn := fileKeyringPasswordFuncFrom("pw", true, false)
+	fn := fileKeyringPasswordFuncFrom("pw", true, false, false)
 	if got, err := fn("prompt"); err != nil {
 		t.Fatalf("expected password, got err: %v", err)
 	} else if got != "pw" {
 		t.Fatalf("unexpected password: %q", got)
 	}
 
-	// Empty password with passwordSet=true returns empty string (not an error).
-	fn = fileKeyringPasswordFuncFrom("", true, false)
+	// Empty password with passwordSet=true is rejected by default.
+	fn = fileKeyringPasswordFuncFrom("", true, false, false)
+	if _, err := fn("prompt"); err == nil || !errors.Is(err, errEmptyKeyringPassword) {
+		t.Fatalf("expected empty-password error, got: %v", err)
+	}
+
+	// Empty password is allowed only when explicitly opted in.
+	fn = fileKeyringPasswordFuncFrom("", true, false, true)
 	if got, err := fn("prompt"); err != nil {
-		t.Fatalf("expected empty password, got err: %v", err)
+		t.Fatalf("expected empty password to be allowed, got err: %v", err)
 	} else if got != "" {
 		t.Fatalf("expected empty password, got: %q", got)
 	}
 
 	// Env var not set and no TTY returns errNoTTY.
-	fn = fileKeyringPasswordFuncFrom("", false, false)
+	fn = fileKeyringPasswordFuncFrom("", false, false, false)
 	if _, err := fn("prompt"); err == nil || !errors.Is(err, errNoTTY) {
 		t.Fatalf("expected no TTY error, got: %v", err)
 	}

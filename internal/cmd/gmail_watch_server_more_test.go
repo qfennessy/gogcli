@@ -471,7 +471,9 @@ func TestGmailWatchServer_OIDCAudience(t *testing.T) {
 	r.Host = "example.com"
 	r.Header.Set("X-Forwarded-Proto", "https")
 	r.Header.Set("X-Forwarded-Host", "proxy.example.com")
-	if got := gmailwatch.Audience(r, s.cfg.OIDCAudience); got != "https://proxy.example.com/x" {
+	// Default config does not trust forwarded headers, so the spoofable
+	// X-Forwarded-Host is ignored and the audience comes from the request.
+	if got := gmailwatch.Audience(r, s.cfg.OIDCAudience, s.cfg.TrustForwarded); got != "https://example.com/x" {
 		t.Fatalf("unexpected audience: %q", got)
 	}
 }

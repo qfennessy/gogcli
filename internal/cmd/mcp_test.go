@@ -29,6 +29,23 @@ func TestMCPEnabledToolsDefaultReadOnly(t *testing.T) {
 	}
 }
 
+func TestMCPToolWriteGatedFailsClosed(t *testing.T) {
+	if mcpToolWriteGated(mcpToolSpec{Risk: mcpRiskRead}) {
+		t.Fatal("read-only tool must not be write-gated")
+	}
+	if !mcpToolWriteGated(mcpToolSpec{Risk: mcpRiskWrite}) {
+		t.Fatal("write tool must be write-gated")
+	}
+	// A new tool whose Risk was left unset or mistyped must stay hidden by
+	// default rather than leak through as read-only.
+	if !mcpToolWriteGated(mcpToolSpec{}) {
+		t.Fatal("tool with unset Risk must be write-gated (fail closed)")
+	}
+	if !mcpToolWriteGated(mcpToolSpec{Risk: mcpToolRisk("bogus")}) {
+		t.Fatal("tool with unknown Risk must be write-gated (fail closed)")
+	}
+}
+
 func TestMCPEnabledToolsAllowWriteAndFilter(t *testing.T) {
 	tools := mcpEnabledTools(McpCmd{AllowWrite: true, AllowTool: []string{"docs.*"}})
 	if !hasMCPTool(tools, "docs_get") || !hasMCPTool(tools, "docs_write") {

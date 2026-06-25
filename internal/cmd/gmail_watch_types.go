@@ -19,28 +19,29 @@ const (
 )
 
 type gmailWatchServeConfig struct {
-	Account       string
-	Bind          string
-	Port          int
-	Path          string
-	VerifyOIDC    bool
-	OIDCEmail     string
-	OIDCAudience  string
-	SharedToken   string
-	HookURL       string
-	HookToken     string
-	IncludeBody   bool
-	MaxBodyBytes  int
-	ExcludeLabels []string
-	HistoryMax    int64
-	ResyncMax     int64
-	FetchDelay    time.Duration
-	HistoryTypes  []string
-	HookTimeout   time.Duration
-	DateLocation  *time.Location
-	PersistHook   bool
-	AllowNoHook   bool
-	VerboseOutput bool
+	Account        string
+	Bind           string
+	Port           int
+	Path           string
+	VerifyOIDC     bool
+	OIDCEmail      string
+	OIDCAudience   string
+	SharedToken    string
+	TrustForwarded bool
+	HookURL        string
+	HookToken      string
+	IncludeBody    bool
+	MaxBodyBytes   int
+	ExcludeLabels  []string
+	HistoryMax     int64
+	ResyncMax      int64
+	FetchDelay     time.Duration
+	HistoryTypes   []string
+	HookTimeout    time.Duration
+	DateLocation   *time.Location
+	PersistHook    bool
+	AllowNoHook    bool
+	VerboseOutput  bool
 }
 
 var gmailHistoryTypes = []string{

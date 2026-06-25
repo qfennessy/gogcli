@@ -60,10 +60,11 @@ func (s *gmailWatchServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *gmailWatchServer) authorize(r *http.Request) bool {
 	authorizer := gmailwatch.Authorizer{
 		Config: gmailwatch.AuthConfig{
-			VerifyOIDC:   s.cfg.VerifyOIDC,
-			OIDCEmail:    s.cfg.OIDCEmail,
-			OIDCAudience: s.cfg.OIDCAudience,
-			SharedToken:  s.cfg.SharedToken,
+			VerifyOIDC:     s.cfg.VerifyOIDC,
+			OIDCEmail:      s.cfg.OIDCEmail,
+			OIDCAudience:   s.cfg.OIDCAudience,
+			SharedToken:    s.cfg.SharedToken,
+			TrustForwarded: s.cfg.TrustForwarded,
 		},
 		Verify: func(ctx context.Context, token, audience, email string) (bool, error) {
 			return verifyOIDCToken(ctx, s.validator, token, audience, email)

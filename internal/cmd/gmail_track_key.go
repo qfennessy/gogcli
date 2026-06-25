@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/tracking"
 	"github.com/steipete/gogcli/internal/ui"
@@ -32,6 +33,13 @@ func (c *GmailTrackKeyRotateCmd) Run(ctx context.Context, flags *RootFlags) erro
 			"worker_dir": workerDir,
 			"deploy":     !c.NoDeploy,
 		})
+	}
+
+	// Rotating with a deploy pushes new keys to the external Cloudflare Worker
+	// via wrangler — a runtime mutation outside the HTTP transport choke point,
+	// so --readonly must block it explicitly (dry-run already returned above).
+	if !c.NoDeploy && readOnlyEnabled(flags) {
+		return fmt.Errorf("%w: gmail track key rotate --deploy deploys external infrastructure", googleapi.ErrReadOnly)
 	}
 
 	account, cfg, configStore, secretStore, err := loadTrackingConfigForAccount(ctx, flags)

@@ -13,9 +13,66 @@ import (
 
 	"github.com/steipete/gogcli/internal/app"
 	"github.com/steipete/gogcli/internal/config"
+	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/secrets"
 	"github.com/steipete/gogcli/internal/tracking"
 )
+
+func TestGmailTrackSetup_ReadonlyBlocksDeploy(t *testing.T) {
+	setupTrackingEnv(t)
+
+	ctx := newCmdRuntimeOutputContext(t, io.Discard, io.Discard)
+	err := (&GmailTrackSetupCmd{Deploy: true, WorkerURL: "https://example.com"}).
+		Run(ctx, &RootFlags{Account: "a@b.com", ReadOnly: true})
+	if !errors.Is(err, googleapi.ErrReadOnly) {
+		t.Fatalf("expected ErrReadOnly for --deploy under --readonly, got: %v", err)
+	}
+}
+
+func TestGmailTrackSetup_ReadonlyAllowsDryRunDeploy(t *testing.T) {
+	setupTrackingEnv(t)
+
+	// Dry-run is a plan, not a mutation, so --readonly must not block it.
+	err := Execute([]string{
+		"--account", "a@b.com",
+		"--no-input", "--json", "--dry-run", "--readonly",
+		"gmail", "track", "setup",
+		"--worker-url", "https://example.com",
+		"--deploy",
+	})
+	if err != nil {
+		t.Fatalf("dry-run deploy under --readonly should succeed, got: %v", err)
+	}
+}
+
+func TestGmailTrackKeyRotate_ReadonlyBlocksDeploy(t *testing.T) {
+	setupTrackingEnv(t)
+
+	ctx := newCmdRuntimeOutputContext(t, io.Discard, io.Discard)
+	err := (&GmailTrackKeyRotateCmd{}).Run(ctx, &RootFlags{Account: "a@b.com", ReadOnly: true})
+	if !errors.Is(err, googleapi.ErrReadOnly) {
+		t.Fatalf("expected ErrReadOnly for key rotate deploy under --readonly, got: %v", err)
+	}
+}
+
+func TestReadOnlyEnvIsFloor(t *testing.T) {
+	setupTrackingEnv(t)
+	t.Setenv("GOG_READONLY", "1")
+
+	// GOG_READONLY=1 must force read-only even when --readonly=false is passed
+	// explicitly, so the subprocess deploy guard still fires.
+	err := Execute([]string{
+		"--readonly=false",
+		"--account", "a@b.com",
+		"--no-input",
+		"gmail", "track", "setup",
+		"--worker-url", "https://example.com",
+		"--deploy",
+	})
+	if !errors.Is(err, googleapi.ErrReadOnly) {
+		t.Fatalf("GOG_READONLY floor should force read-only despite --readonly=false; got: %v", err)
+	}
+}
 
 var errUnexpectedTrackingSecretStoreOpen = errors.New("unexpected tracking secret store open")
 

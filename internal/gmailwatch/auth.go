@@ -9,10 +9,11 @@ import (
 )
 
 type AuthConfig struct {
-	VerifyOIDC   bool
-	OIDCEmail    string
-	OIDCAudience string
-	SharedToken  string
+	VerifyOIDC     bool
+	OIDCEmail      string
+	OIDCAudience   string
+	SharedToken    string
+	TrustForwarded bool
 }
 
 type OIDCVerifier func(context.Context, string, string, string) (bool, error)
@@ -27,7 +28,7 @@ func (a *Authorizer) Authorize(request *http.Request) bool {
 	if a.Config.VerifyOIDC {
 		bearer := BearerToken(request)
 		if bearer != "" && a.Verify != nil {
-			if ok, err := a.Verify(request.Context(), bearer, Audience(request, a.Config.OIDCAudience), a.Config.OIDCEmail); ok {
+			if ok, err := a.Verify(request.Context(), bearer, Audience(request, a.Config.OIDCAudience, a.Config.TrustForwarded), a.Config.OIDCEmail); ok {
 				return true
 			} else if err != nil {
 				a.warnf("watch: oidc verify failed: %v", err)
@@ -48,7 +49,13 @@ func (a *Authorizer) Authorize(request *http.Request) bool {
 	return SharedTokenMatches(request, a.Config.SharedToken)
 }
 
-func Audience(request *http.Request, explicit string) string {
+// Audience derives the expected OIDC audience for the push endpoint. An explicit
+// value (from --oidc-audience) always wins. Otherwise it is built from the
+// request, and X-Forwarded-Proto/Host are honored ONLY when trustForwarded is
+// set: those headers are attacker-controllable, so trusting them by default
+// would let a caller pick the audience their (validly Google-signed) token
+// claims, defeating the audience binding.
+func Audience(request *http.Request, explicit string, trustForwarded bool) string {
 	if explicit != "" {
 		return explicit
 	}
@@ -58,13 +65,16 @@ func Audience(request *http.Request, explicit string) string {
 		scheme = "https"
 	}
 
-	if forwarded := firstForwardedValue(request.Header.Get("X-Forwarded-Proto")); forwarded != "" {
-		scheme = forwarded
-	}
-
 	host := request.Host
-	if forwarded := firstForwardedValue(request.Header.Get("X-Forwarded-Host")); forwarded != "" {
-		host = forwarded
+
+	if trustForwarded {
+		if forwarded := firstForwardedValue(request.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+			scheme = forwarded
+		}
+
+		if forwarded := firstForwardedValue(request.Header.Get("X-Forwarded-Host")); forwarded != "" {
+			host = forwarded
+		}
 	}
 
 	return fmt.Sprintf("%s://%s%s", scheme, host, request.URL.Path)

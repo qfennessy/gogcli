@@ -20,7 +20,7 @@ type AuthAddCmd struct {
 	Manual       bool          `name:"manual" help:"Browserless auth flow (paste redirect URL)"`
 	Remote       bool          `name:"remote" help:"Remote/server-friendly manual flow (print URL, then exchange code)"`
 	Step         int           `name:"step" help:"Remote auth step: 1=print URL, 2=exchange code"`
-	ListenAddr   string        `name:"listen-addr" help:"Address to listen on for OAuth callback (for example 0.0.0.0 or 0.0.0.0:8080)"`
+	ListenAddr   string        `name:"listen-addr" help:"Loopback address for the OAuth callback server (default 127.0.0.1; for example 127.0.0.1:8080). Non-loopback binds require an explicit --redirect-uri/--redirect-host; use --remote/--manual for headless auth"`
 	RedirectHost string        `name:"redirect-host" help:"Hostname for OAuth callback in browser flows; builds https://{host}/oauth2/callback"`
 	RedirectURI  string        `name:"redirect-uri" help:"Override OAuth redirect URI for manual/remote flows (for example https://host.example/oauth2/callback)"`
 	AuthURL      string        `name:"auth-url" help:"Redirect URL from browser (manual flow; required for --remote --step 2)"`

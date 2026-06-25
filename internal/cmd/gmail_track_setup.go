@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/input"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/tracking"
@@ -27,6 +28,19 @@ type GmailTrackSetupCmd struct {
 	WorkerDir    string `name:"worker-dir" help:"Worker directory (default: internal/tracking/worker)"`
 }
 
+// ensureDeployAllowedUnderReadOnly blocks --deploy under --readonly. Deploying
+// provisions/updates external Cloudflare infrastructure (D1 + Worker + secrets)
+// via wrangler — a real state change that runs as a subprocess rather than
+// through the HTTP transport choke point, so it must be refused explicitly.
+// Dry-run is exempt because it only prints a plan.
+func (c *GmailTrackSetupCmd) ensureDeployAllowedUnderReadOnly(flags *RootFlags) error {
+	if c.Deploy && readOnlyEnabled(flags) && !flags.DryRun {
+		return fmt.Errorf("%w: gmail track setup --deploy provisions external infrastructure", googleapi.ErrReadOnly)
+	}
+
+	return nil
+}
+
 func (c *GmailTrackSetupCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
 
@@ -35,6 +49,10 @@ func (c *GmailTrackSetupCmd) Run(ctx context.Context, flags *RootFlags) error {
 		strings.TrimSpace(flags.Account) == "" &&
 		strings.TrimSpace(os.Getenv("GOG_ACCOUNT")) == "" {
 		return usage("missing --account (dry-run requires an explicit account and does not auto-select)")
+	}
+
+	if err := c.ensureDeployAllowedUnderReadOnly(flags); err != nil {
+		return err
 	}
 
 	var (

@@ -2,13 +2,136 @@ package googleauth
 
 import (
 	"context"
+	"errors"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
 	"golang.org/x/oauth2"
+
+	"github.com/steipete/gogcli/internal/config"
 )
+
+func TestValidateCallbackListenAddr(t *testing.T) {
+	t.Parallel()
+
+	allowed := []string{"127.0.0.1:0", "127.0.0.1:8080", "localhost:8080", "[::1]:0"}
+	for _, addr := range allowed {
+		if err := validateCallbackListenAddr(addr); err != nil {
+			t.Errorf("validateCallbackListenAddr(%q): unexpected error %v", addr, err)
+		}
+	}
+
+	rejected := []string{"0.0.0.0:0", "0.0.0.0:8080", "192.168.1.5:8080", "[::]:8080"}
+	for _, addr := range rejected {
+		if err := validateCallbackListenAddr(addr); !errors.Is(err, errNonLoopbackCallback) {
+			t.Errorf("validateCallbackListenAddr(%q): expected errNonLoopbackCallback, got %v", addr, err)
+		}
+	}
+}
+
+func TestRequestHostIsLoopback(t *testing.T) {
+	t.Parallel()
+
+	loopback := []string{"127.0.0.1:8080", "localhost:8080", "[::1]:8080", "127.0.0.1", "localhost", "[::1]"}
+	for _, h := range loopback {
+		if !requestHostIsLoopback(h) {
+			t.Errorf("requestHostIsLoopback(%q) = false, want true", h)
+		}
+	}
+
+	nonLoopback := []string{"", "attacker.example.com", "attacker.example.com:8080", "169.254.169.254", "10.0.0.1:80", "0.0.0.0:8080"}
+	for _, h := range nonLoopback {
+		if requestHostIsLoopback(h) {
+			t.Errorf("requestHostIsLoopback(%q) = true, want false", h)
+		}
+	}
+}
+
+func TestSecureManagerHandlerHostGuard(t *testing.T) {
+	t.Parallel()
+
+	// Default local flow: the launcher resolves RedirectURI to a listener-derived
+	// loopback URL, which must activate the Host guard.
+	app := &ManagerApplication{opts: ManagerOptions{RedirectURI: "http://127.0.0.1:8788/oauth2/callback"}}
+	called := false
+	handler := app.secureManagerHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// A DNS-rebinding request carries an attacker hostname in Host and is rejected
+	// before reaching the wrapped handler.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req.Host = "attacker.example.com"
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("non-loopback Host: code = %d, want 403", rec.Code)
+	}
+
+	if called {
+		t.Fatal("handler ran for a non-loopback Host")
+	}
+
+	// A genuine loopback request passes and receives Referrer-Policy: no-referrer.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req.Host = "127.0.0.1:8788"
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("loopback Host: code = %d called = %v, want 200/true", rec.Code, called)
+	}
+
+	if got := rec.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Fatalf("Referrer-Policy = %q, want no-referrer", got)
+	}
+}
+
+func TestSecureManagerHandlerSkipsHostGuardWhenFronted(t *testing.T) {
+	t.Parallel()
+
+	// An explicit non-loopback RedirectURI means the operator is fronting the
+	// server (e.g. an HTTPS reverse proxy), so the loopback Host guard is skipped
+	// and a non-loopback Host (the proxy's external host) is allowed through.
+	app := &ManagerApplication{opts: ManagerOptions{RedirectURI: "https://gog.example.com/oauth2/callback"}}
+	called := false
+	handler := app.secureManagerHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	req.Host = "gog.example.com"
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("fronted server should allow external Host: code = %d called = %v", rec.Code, called)
+	}
+
+	if got := rec.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Fatalf("Referrer-Policy = %q, want no-referrer", got)
+	}
+}
+
+func TestAuthorizeServerRejectsNonLoopbackWithoutRedirectOverride(t *testing.T) {
+	t.Parallel()
+
+	// No explicit redirect override: the code would arrive on the bound socket,
+	// so a non-loopback bind must be refused before listening.
+	_, err := authorizeServer(context.Background(), AuthorizeOptions{ListenAddr: "0.0.0.0:0"}, config.ClientCredentials{})
+	if !errors.Is(err, errNonLoopbackCallback) {
+		t.Fatalf("expected errNonLoopbackCallback, got %v", err)
+	}
+}
 
 func TestAuthURLParams(t *testing.T) {
 	t.Parallel()
