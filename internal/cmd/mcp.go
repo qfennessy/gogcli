@@ -113,7 +113,7 @@ func newMCPTool(tool mcpToolSpec) mcp.Tool {
 	opts := append([]mcp.ToolOption{
 		mcp.WithDescription(tool.Description),
 		mcp.WithReadOnlyHintAnnotation(tool.Risk == mcpRiskRead),
-		mcp.WithDestructiveHintAnnotation(tool.Risk == mcpRiskWrite),
+		mcp.WithDestructiveHintAnnotation(tool.Risk != mcpRiskRead),
 		mcp.WithIdempotentHintAnnotation(tool.Risk == mcpRiskRead),
 		mcp.WithOpenWorldHintAnnotation(true),
 		mcp.WithSchemaAdditionalProperties(false),
@@ -242,12 +242,20 @@ func mcpParentSafetyArgs(flags *RootFlags) []string {
 	return out
 }
 
+// mcpToolWriteGated reports whether a tool must be hidden unless --allow-write
+// is set. It fails closed: only tools explicitly marked read-only are ungated,
+// so a new tool whose Risk is left unset or mistyped stays hidden by default
+// rather than leaking write access through a missing annotation.
+func mcpToolWriteGated(tool mcpToolSpec) bool {
+	return tool.Risk != mcpRiskRead
+}
+
 func mcpEnabledTools(cmd McpCmd) []mcpToolSpec {
 	all := mcpAllTools()
 	allow := splitCommaValues(cmd.AllowTool)
 	out := make([]mcpToolSpec, 0, len(all))
 	for _, tool := range all {
-		if tool.Risk == mcpRiskWrite && !cmd.AllowWrite {
+		if mcpToolWriteGated(tool) && !cmd.AllowWrite {
 			continue
 		}
 		if len(allow) > 0 && !mcpToolAllowed(tool, allow) {

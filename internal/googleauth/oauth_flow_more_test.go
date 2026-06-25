@@ -2,13 +2,45 @@ package googleauth
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/url"
 	"strings"
 	"testing"
 
 	"golang.org/x/oauth2"
+
+	"github.com/steipete/gogcli/internal/config"
 )
+
+func TestValidateCallbackListenAddr(t *testing.T) {
+	t.Parallel()
+
+	allowed := []string{"127.0.0.1:0", "127.0.0.1:8080", "localhost:8080", "[::1]:0"}
+	for _, addr := range allowed {
+		if err := validateCallbackListenAddr(addr); err != nil {
+			t.Errorf("validateCallbackListenAddr(%q): unexpected error %v", addr, err)
+		}
+	}
+
+	rejected := []string{"0.0.0.0:0", "0.0.0.0:8080", "192.168.1.5:8080", "[::]:8080"}
+	for _, addr := range rejected {
+		if err := validateCallbackListenAddr(addr); !errors.Is(err, errNonLoopbackCallback) {
+			t.Errorf("validateCallbackListenAddr(%q): expected errNonLoopbackCallback, got %v", addr, err)
+		}
+	}
+}
+
+func TestAuthorizeServerRejectsNonLoopbackWithoutRedirectOverride(t *testing.T) {
+	t.Parallel()
+
+	// No explicit redirect override: the code would arrive on the bound socket,
+	// so a non-loopback bind must be refused before listening.
+	_, err := authorizeServer(context.Background(), AuthorizeOptions{ListenAddr: "0.0.0.0:0"}, config.ClientCredentials{})
+	if !errors.Is(err, errNonLoopbackCallback) {
+		t.Fatalf("expected errNonLoopbackCallback, got %v", err)
+	}
+}
 
 func TestAuthURLParams(t *testing.T) {
 	t.Parallel()

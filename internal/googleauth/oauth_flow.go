@@ -164,6 +164,17 @@ func authorizeServer(ctx context.Context, opts AuthorizeOptions, creds config.Cl
 		return "", err
 	}
 
+	// Without an explicit redirect override the callback URL is derived from the
+	// listener and the authorization code arrives over plaintext HTTP on the
+	// bound socket. Refuse non-loopback binds in that mode so the code never
+	// leaves the local host. An explicit --redirect-uri/--redirect-host (e.g. an
+	// HTTPS reverse proxy fronting the callback) opts out of this guard.
+	if strings.TrimSpace(opts.RedirectURI) == "" {
+		if cbErr := validateCallbackListenAddr(listenAddr); cbErr != nil {
+			return "", cbErr
+		}
+	}
+
 	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", listenAddr)
 	if err != nil {
 		return "", fmt.Errorf("listen for callback: %w", err)

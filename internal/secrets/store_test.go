@@ -24,7 +24,7 @@ func keyringConfig(keyringDir string) keyring.Config {
 		KeychainTrustApplication: false,
 		AllowedBackends:          []keyring.BackendType{keyring.FileBackend},
 		FileDir:                  keyringDir,
-		FilePasswordFunc:         fileKeyringPasswordFuncFrom("testpass", true, false),
+		FilePasswordFunc:         fileKeyringPasswordFuncFrom("testpass", true, false, false),
 	}
 }
 

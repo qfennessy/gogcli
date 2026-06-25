@@ -168,14 +168,17 @@ func addKeyringEnvChecks(ctx context.Context, add func(string, string, string, s
 	}
 
 	password, passwordSet := os.LookupEnv("GOG_KEYRING_PASSWORD")
+	allowEmpty := envBool("GOG_ALLOW_EMPTY_KEYRING_PASSWORD")
 	likelyFile := backendInfo.Value == strFile || (runtime.GOOS == "linux" && backendInfo.Value == "auto" && os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "")
 	if !likelyFile {
 		return
 	}
 
 	switch {
+	case passwordSet && password == "" && allowEmpty:
+		add("keyring.password", doctorWarn, "GOG_KEYRING_PASSWORD is empty and GOG_ALLOW_EMPTY_KEYRING_PASSWORD is set", "the on-disk file keyring is effectively unencrypted; set a non-empty passphrase or use a system keyring")
 	case passwordSet && password == "":
-		add("keyring.password", doctorWarn, "GOG_KEYRING_PASSWORD is set to an empty string", "empty is valid but easy to set accidentally; keep it identical in every shell/service")
+		add("keyring.password", doctorError, "GOG_KEYRING_PASSWORD is set to an empty string", "an empty passphrase is rejected; set a non-empty GOG_KEYRING_PASSWORD, or set GOG_ALLOW_EMPTY_KEYRING_PASSWORD=1 to accept an unencrypted file keyring")
 	case passwordSet:
 		add("keyring.password", doctorOK, "GOG_KEYRING_PASSWORD is set", "keep this value identical across shell, service, and agent configs")
 	case !stdinIsTerminal(ctx):

@@ -11,6 +11,7 @@ import (
 var (
 	errInvalidListenAddr     = errors.New("invalid listen address; use host or host:port")
 	errNonLoopbackManageAddr = errors.New("accounts manager listen address must be loopback")
+	errNonLoopbackCallback   = errors.New("OAuth callback listen address must be loopback (127.0.0.1/localhost/[::1]); to front the callback yourself pass --redirect-uri/--redirect-host (e.g. an HTTPS reverse proxy), or use --remote/--manual for headless auth")
 )
 
 func normalizeListenAddr(raw string) (string, error) {
@@ -59,19 +60,47 @@ func listenerURLHost(addr *net.TCPAddr) string {
 	return addr.IP.String()
 }
 
-func validateManagementListenAddr(listenAddr string) error {
+func isLoopbackListenAddr(listenAddr string) (bool, error) {
 	host, _, err := net.SplitHostPort(listenAddr)
 	if err != nil {
-		return fmt.Errorf("%w: %q", errInvalidListenAddr, listenAddr)
+		return false, fmt.Errorf("%w: %q", errInvalidListenAddr, listenAddr)
 	}
 
 	if strings.EqualFold(host, "localhost") {
-		return nil
+		return true, nil
 	}
 
 	ip := net.ParseIP(host)
-	if ip == nil || !ip.IsLoopback() {
+
+	return ip != nil && ip.IsLoopback(), nil
+}
+
+func validateManagementListenAddr(listenAddr string) error {
+	loopback, err := isLoopbackListenAddr(listenAddr)
+	if err != nil {
+		return err
+	}
+
+	if !loopback {
 		return fmt.Errorf("%w: %s", errNonLoopbackManageAddr, listenAddr)
+	}
+
+	return nil
+}
+
+// validateCallbackListenAddr rejects non-loopback binds for the local OAuth
+// callback server. It is only meaningful when the redirect URI is derived from
+// the listener itself: in that mode the authorization code is delivered to the
+// bound socket over plaintext HTTP, so a non-loopback bind would expose the
+// code to other hosts on the network.
+func validateCallbackListenAddr(listenAddr string) error {
+	loopback, err := isLoopbackListenAddr(listenAddr)
+	if err != nil {
+		return err
+	}
+
+	if !loopback {
+		return fmt.Errorf("%w: %s", errNonLoopbackCallback, listenAddr)
 	}
 
 	return nil
